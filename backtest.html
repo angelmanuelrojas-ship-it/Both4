@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOT 4H — Backtesting Pro</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+  :root {
+    --bg:#080b10;--surface:#0d1117;--surface2:#111820;
+    --border:#1a2235;--border2:#222e45;
+    --text:#a8b8cc;--text2:#d4e0f0;--muted:#384556;
+    --buy:#05d68c;--buy-dim:rgba(5,214,140,.10);--buy-ring:rgba(5,214,140,.28);
+    --sell:#f03d5f;--sell-dim:rgba(240,61,95,.10);--sell-ring:rgba(240,61,95,.28);
+    --neutral:#f5a623;--accent:#4d8bff;--accent2:#2562e8;--purple:#a855f7;
+    --mono:'IBM Plex Mono','Fira Code',monospace;--sans:'Inter',system-ui,sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;min-height:100vh;line-height:1.5}
+  ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--surface)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+  header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:54px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:100}
+  .logo{font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.1em;color:#fff;display:flex;align-items:center;gap:8px}
+  .logo-badge{background:var(--accent2);color:#fff;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px}
+  .logo-bt{background:#854d0e;color:#fde68a;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px}
+  .hright{display:flex;align-items:center;gap:12px}
+  #run-btn{background:var(--accent);color:#fff;border:none;padding:0 18px;height:32px;border-radius:6px;font-size:11px;font-weight:600;font-family:var(--mono);cursor:pointer;transition:background .15s}
+  #run-btn:hover{background:#5f9bff}
+  #run-btn:disabled{opacity:.35;cursor:not-allowed}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
+  .dot.live{background:var(--buy);box-shadow:0 0 0 3px var(--buy-ring);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  #stxt{font-family:var(--mono);font-size:11px;color:var(--text)}
+
+  .main{padding:20px;max-width:1400px}
+
+  /* Progress */
+  .progress-wrap{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin-bottom:18px;display:none}
+  .progress-label{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px}
+  .progress-bar{height:6px;background:var(--border2);border-radius:3px;overflow:hidden}
+  .progress-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .3s}
+
+  /* Metrics grid */
+  .metrics{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:20px}
+  .mc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;position:relative;overflow:hidden}
+  .mc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--border2)}
+  .mc.green::before{background:var(--buy)}.mc.red::before{background:var(--sell)}.mc.purple::before{background:var(--purple)}.mc.gold::before{background:var(--neutral)}
+  .mc .l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;font-family:var(--mono)}
+  .mc .v{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--text2)}
+  .mc .v.g{color:var(--buy)}.mc .v.r{color:var(--sell)}.mc .v.p{color:var(--purple)}.mc .v.n{color:var(--neutral)}
+  .mc .sub{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px}
+
+  /* Equity chart */
+  .chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:20px}
+  .chart-title{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:12px}
+  canvas{width:100%!important;height:220px!important}
+
+  /* Trades table */
+  .trades-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px}
+  .tw-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--surface2)}
+  .tw-title{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+  .filter-btns{display:flex;gap:6px}
+  .fb{background:none;border:1px solid var(--border2);color:var(--muted);font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:4px;cursor:pointer;transition:all .15s}
+  .fb.active,.fb:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .th,.td-row{display:grid;grid-template-columns:44px 60px 55px 80px 80px 80px 70px 70px 70px 1fr;padding:8px 14px;gap:4px;font-family:var(--mono);font-size:10px}
+  .th{background:var(--surface2);color:var(--muted);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border);font-size:9px}
+  .td-row{border-bottom:1px solid var(--border);align-items:center;transition:background .1s}
+  .td-row:last-child{border-bottom:none}
+  .td-row:hover{background:rgba(77,139,255,.04)}
+  .td-row.win{border-left:3px solid var(--buy)}
+  .td-row.loss{border-left:3px solid var(--sell)}
+  .td-row.win,.td-row.loss{padding-left:11px}
+  #trades-body{max-height:420px;overflow-y:auto}
+
+  .badge-s{display:inline-block;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700;font-family:var(--mono)}
+  .badge-buy{background:var(--buy-dim);color:var(--buy);border:1px solid var(--buy-ring)}
+  .badge-sell{background:var(--sell-dim);color:var(--sell);border:1px solid var(--sell-ring)}
+  .win-tag{color:var(--buy);font-weight:700}
+  .loss-tag{color:var(--sell);font-weight:700}
+
+  /* Per-pair summary */
+  .pairs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:20px}
+  .pc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 14px}
+  .pc-name{font-family:var(--mono);font-weight:700;font-size:13px;color:#fff;margin-bottom:6px}
+  .pc-stat{font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.8}
+  .pc-stat span{color:var(--text2)}
+  .pc-pnl{font-family:var(--mono);font-size:14px;font-weight:700;margin-top:6px}
+
+  .empty{text-align:center;padding:44px;color:var(--muted);font-family:var(--mono);font-size:12px}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .log-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+  .lh{padding:9px 14px;border-bottom:1px solid var(--border);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-family:var(--mono);display:flex;justify-content:space-between;background:var(--surface2)}
+  .lh button{background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:9px;cursor:pointer;text-transform:uppercase;letter-spacing:.1em}
+  #log{height:110px;overflow-y:auto;padding:10px 14px;font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--muted)}
+  #log .i{color:var(--text)}#log .b{color:var(--buy)}#log .s{color:var(--sell)}#log .w{color:var(--neutral)}
+  #log .ts{color:var(--border2);margin-right:8px;user-select:none}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">BOT4H <span class="logo-badge">4H</span><span class="logo-bt">BACKTEST</span></div>
+  <div class="hright">
+    <span class="dot" id="sdot"></span>
+    <span id="stxt">Listo</span>
+    <button id="run-btn" onclick="runBacktest()">▶ Iniciar Backtest</button>
+  </div>
+</header>
+
+<div class="main">
+
+  <div class="progress-wrap" id="progress-wrap">
+    <div class="progress-label" id="progress-label">Cargando…</div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+  </div>
+
+  <!-- Métricas globales -->
+  <div class="metrics" id="metrics">
+    <div class="mc"><div class="l">Capital inicial</div><div class="v">$5,000</div></div>
+    <div class="mc"><div class="l">Capital final</div><div class="v" id="m-final">—</div></div>
+    <div class="mc green"><div class="l">Rentabilidad</div><div class="v g" id="m-ret">—</div></div>
+    <div class="mc"><div class="l">Total trades</div><div class="v" id="m-trades">—</div></div>
+    <div class="mc green"><div class="l">Win Rate</div><div class="v g" id="m-wr">—</div></div>
+    <div class="mc red"><div class="l">Max Drawdown</div><div class="v r" id="m-dd">—</div></div>
+    <div class="mc gold"><div class="l">Profit Factor</div><div class="v n" id="m-pf">—</div></div>
+    <div class="mc purple"><div class="l">Mejor trade</div><div class="v p" id="m-best">—</div></div>
+    <div class="mc red"><div class="l">Peor trade</div><div class="v r" id="m-worst">—</div></div>
+    <div class="mc"><div class="l">Período</div><div class="v" style="font-size:13px" id="m-period">—</div></div>
+  </div>
+
+  <!-- Equity curve -->
+  <div class="chart-wrap">
+    <div class="chart-title">Curva de Equity — Capital $5,000</div>
+    <canvas id="equity-chart"></canvas>
+  </div>
+
+  <!-- Por par -->
+  <div class="chart-wrap">
+    <div class="chart-title">Resultados por par</div>
+    <canvas id="pair-chart"></canvas>
+  </div>
+
+  <!-- Tabla de trades -->
+  <div class="trades-wrap">
+    <div class="tw-header">
+      <span class="tw-title" id="trades-title">Trades — 0 total</span>
+      <div class="filter-btns">
+        <button class="fb active" onclick="filterTrades('all',this)">Todos</button>
+        <button class="fb" onclick="filterTrades('win',this)">Ganados</button>
+        <button class="fb" onclick="filterTrades('loss',this)">Perdidos</button>
+        <button class="fb" onclick="filterTrades('buy',this)">BUY</button>
+        <button class="fb" onclick="filterTrades('sell',this)">SELL</button>
+      </div>
+    </div>
+    <div class="th">
+      <div>#</div><div>Par</div><div>Tipo</div>
+      <div>Entrada</div><div>SL</div><div>TP</div>
+      <div>Resultado</div><div>P&L $</div><div>Capital</div><div>Fecha</div>
+    </div>
+    <div id="trades-body">
+      <div class="empty">Presiona <strong style="color:#fff">Iniciar Backtest</strong> para simular la estrategia</div>
+    </div>
+  </div>
+
+  <!-- Por par grid -->
+  <div class="pairs-grid" id="pairs-grid"></div>
+
+  <div class="log-panel">
+    <div class="lh"><span>Log</span><button onclick="document.getElementById('log').innerHTML=''">Limpiar</button></div>
+    <div id="log"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════
+//  BOT4H BACKTEST — 2 meses histórico en 4H
+//  SL: -1% | TP: +2.5% | Capital: $5,000
+//  Riesgo por trade: 2% del capital actual
+// ════════════════════════════════════════════════════════════
+
+const KRAKEN_MAP={
+  BTC:'XBTUSD',ETH:'ETHUSD',SOL:'SOLUSD',BNB:'BNBUSD',
+  SUI:'SUIUSD',ADA:'ADAUSD',XRP:'XRPUSD',DOT:'DOTUSD',
+  LINK:'LINKUSD',AVAX:'AVAXUSD',
+};
+const PAIRS=Object.keys(KRAKEN_MAP);
+const INITIAL_CAPITAL=5000;
+const RISK_PER_TRADE=0.02;  // 2% del capital por trade
+const SL_PCT=0.01;          // 1% SL
+const TP_PCT=0.025;         // 2.5% TP
+// 2 meses atrás en segundos
+const SINCE=Math.floor(Date.now()/1000)-(60*24*3600);
+
+let allTrades=[];
+let equityCurve=[];
+let equityChart=null;
+let pairChart=null;
+let running=false;
+
+// ── Utils ────────────────────────────────────────────────────
+function log(msg,t='i'){
+  const el=document.getElementById('log');
+  const ts=new Date().toLocaleTimeString('es',{hour12:false});
+  const s=document.createElement('span');
+  s.className=t;
+  s.innerHTML=`<span class="ts">[${ts}]</span>${msg}<br>`;
+  el.appendChild(s);el.scrollTop=el.scrollHeight;
+}
+function setStatus(t,live=false){
+  document.getElementById('stxt').textContent=t;
+  document.getElementById('sdot').className='dot'+(live?' live':'');
+}
+function fmtP(n,d=4){
+  if(n==null)return'—';
+  if(Math.abs(n)>=10000)return n.toFixed(2);
+  if(Math.abs(n)>=100)return n.toFixed(3);
+  if(Math.abs(n)>=1)return n.toFixed(d>4?d:4);
+  return n.toFixed(6);
+}
+function fmtDate(ts){
+  const d=new Date(ts*1000);
+  return d.toLocaleDateString('es',{month:'short',day:'numeric'})+' '+
+         d.toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit',hour12:false});
+}
+function setProgress(pct,label){
+  document.getElementById('progress-fill').style.width=pct+'%';
+  document.getElementById('progress-label').textContent=label;
+}
+
+// ── Fetch Kraken ─────────────────────────────────────────────
+async function fetchKraken(pair,interval=240,since=null){
+  let url=`https://api.kraken.com/0/public/OHLC?pair=${pair}&interval=${interval}`;
+  if(since)url+=`&since=${since}`;
+  const r=await Promise.race([
+    fetch(url),
+    new Promise((_,rej)=>setTimeout(()=>rej(new Error('Timeout')),25000))
+  ]);
+  if(!r.ok)throw new Error(`HTTP ${r.status}`);
+  const d=await r.json();
+  if(d.error&&d.error.length)throw new Error(d.error[0]);
+  const key=Object.keys(d.result).find(k=>k!=='last');
+  if(!key)throw new Error('Sin datos');
+  return d.result[key];
+}
+
+// ── Indicadores ──────────────────────────────────────────────
+function ema(arr,p){
+  if(arr.length<p)return arr.map(()=>null);
+  const k=2/(p+1);
+  let prev=arr.slice(0,p).reduce((a,b)=>a+b,0)/p;
+  const out=new Array(p-1).fill(null);out.push(prev);
+  for(let i=p;i<arr.length;i++){prev=arr[i]*k+prev*(1-k);out.push(prev);}
+  return out;
+}
+function rsiAt(C,i,p=14){
+  if(i<p+1)return 50;
+  let g=0,l=0;
+  for(let j=i-p;j<i;j++){const d=C[j+1]-C[j];if(d>0)g+=d;else l-=d;}
+  g/=p;l/=p;
+  return l===0?100:100-100/(1+g/l);
+}
+function stochAt(H,L,C,i,kp=14,dp=3){
+  if(i<kp+dp*2)return{K:50,Kp:50,D:50,Dp:50};
+  const rK=[];
+  for(let j=i-kp-dp*2+1;j<=i;j++){
+    if(j<kp-1)continue;
+    const hh=Math.max(...H.slice(j-kp+1,j+1));
+    const ll=Math.min(...L.slice(j-kp+1,j+1));
+    rK.push(hh===ll?50:(C[j]-ll)/(hh-ll)*100);
+  }
+  const sK=[];
+  for(let j=dp-1;j<rK.length;j++)
+    sK.push(rK.slice(j-dp+1,j+1).reduce((a,b)=>a+b,0)/dp);
+  const sD=[];
+  for(let j=dp-1;j<sK.length;j++)
+    sD.push(sK.slice(j-dp+1,j+1).reduce((a,b)=>a+b,0)/dp);
+  const n=sK.length,m=sD.length;
+  return{K:sK[n-1]??50,Kp:sK[n-2]??50,D:sD[m-1]??50,Dp:sD[m-2]??50};
+}
+function atrAt(H,L,C,i,p=14){
+  if(i<p+1)return(H[i]-L[i]);
+  let sum=0;
+  for(let j=i-p+1;j<=i;j++)
+    sum+=Math.max(H[j]-L[j],Math.abs(H[j]-C[j-1]),Math.abs(L[j]-C[j-1]));
+  return sum/p;
+}
+function findSRAt(H,L,i,maxD=0.012,minT=3){
+  const start=Math.max(0,i-299);
+  const sh=H.slice(start,i+1),sl=L.slice(start,i+1);
+  const n=sh.length;
+  const pts=[];
+  for(let j=0;j<n;j++){pts.push({p:sh[j],i:j});pts.push({p:sl[j],i:j});}
+  const used=new Set(),zones=[];
+  for(let j=0;j<pts.length;j++){
+    if(used.has(j))continue;
+    const base=pts[j].p,gr=[],idx=[];
+    for(let k=j;k<pts.length;k++){
+      if(!used.has(k)&&Math.abs(pts[k].p-base)/base<=maxD){gr.push(pts[k]);idx.push(k);}
+    }
+    if(gr.length>=minT){
+      const price=gr.reduce((a,b)=>a+b.p,0)/gr.length;
+      const recency=gr.filter(g=>g.i>=(n-50)).length;
+      zones.push({price,touches:gr.length,score:gr.length+recency*1.5});
+      idx.forEach(x=>used.add(x));
+    }
+  }
+  return zones.sort((a,b)=>b.score-a.score);
+}
+function wickAt(O,H,L,C,i,type){
+  const body=Math.abs(C[i]-O[i]);
+  if(!body)return false;
+  return type==='buy'?(Math.min(O[i],C[i])-L[i])>=2*body:(H[i]-Math.max(O[i],C[i]))>=2*body;
+}
+
+// ── Señal en vela i (usa i como cerrada) ─────────────────────
+function getSignal(O,H,L,C,V,e50,e200,i){
+  if(i<202)return null;
+  const bull4H=(e50[i]??0)>(e200[i]??0);
+  const r=rsiAt(C,i,14);
+  const st=stochAt(H,L,C,i,14,3);
+  const atr=atrAt(H,L,C,i,14);
+  const atrAvg=atrAt(H,L,C,Math.max(0,i-50),14);
+
+  // Volumen 3 velas
+  const vol3=V[i]+V[i-1]+V[i-2];
+  const volSlice=V.slice(Math.max(0,i-22),i-2);
+  const volAvg=(volSlice.reduce((a,b)=>a+b,0)/Math.max(1,volSlice.length))*3;
+  const fV=vol3>volAvg*1.05;
+
+  const h20=Math.max(...H.slice(i-20,i+1));
+  const l20=Math.min(...L.slice(i-20,i+1));
+  const rng=(h20-l20)/Math.max(l20,0.0001);
+  const fA=atr>=atrAvg*0.75,fR=rng>=0.04;
+
+  const zones=findSRAt(H,L,i);
+  const price=C[i];
+  const zone=zones.find(z=>Math.abs(price-z.price)/price<=0.015);
+
+  const wB=wickAt(O,H,L,C,i,'buy');
+  const wS=wickAt(O,H,L,C,i,'sell');
+  const xB=st.K>st.D&&st.Kp<=st.Dp&&st.K<28&&st.D<28;
+  const xS=st.K<st.D&&st.Kp>=st.Dp&&st.K>72&&st.D>72;
+
+  const cB=[bull4H,!!zone,r<40,xB,wB];
+  const cS=[!bull4H,!!zone,r>60,xS,wS];
+  const buyOk=cB.every(Boolean)&&fV&&fA&&fR;
+  const sellOk=cS.every(Boolean)&&fV&&fA&&fR;
+
+  if(!buyOk&&!sellOk)return null;
+  return{type:buyOk?'BUY':'SELL',price,atr,zone};
+}
+
+// ── Simular par ───────────────────────────────────────────────
+function simulatePair(sym,kl,kl1d,capital){
+  const O=kl.map(k=>parseFloat(k[1]));
+  const H=kl.map(k=>parseFloat(k[2]));
+  const L=kl.map(k=>parseFloat(k[3]));
+  const C=kl.map(k=>parseFloat(k[4]));
+  const V=kl.map(k=>parseFloat(k[6]));
+  const TS=kl.map(k=>parseInt(k[0]));
+  const n=C.length;
+
+  // 1D para tendencia macro
+  const C1=kl1d.map(k=>parseFloat(k[4]));
+  const e50_1d=ema(C1,Math.min(50,C1.length-1));
+  const e200_1d=ema(C1,Math.min(200,C1.length-1));
+
+  const e50=ema(C,Math.min(50,n-1));
+  const e200=ema(C,Math.min(200,n-1));
+
+  // Solo velas dentro del período de backtest (últimas 2 meses)
+  const cutoff=SINCE;
+  const trades=[];
+  let cap=capital;
+  let inTrade=false;
+  let tradeEntry=null;
+
+  for(let i=202;i<n-1;i++){
+    if(TS[i]<cutoff)continue;
+
+    if(inTrade){
+      // Verificar si la siguiente vela tocó TP o SL
+      const next=i+1;
+      const {type,entry,sl,tp,riskAmt}=tradeEntry;
+      let result=null,exitPrice=null;
+
+      if(type==='BUY'){
+        if(L[next]<=sl){result='LOSS';exitPrice=sl;}
+        else if(H[next]>=tp){result='WIN';exitPrice=tp;}
+      }else{
+        if(H[next]>=sl){result='LOSS';exitPrice=sl;}
+        else if(L[next]<=tp){result='WIN';exitPrice=tp;}
+      }
+
+      if(result){
+        const pnl=result==='WIN'?riskAmt*(TP_PCT/SL_PCT)*1:-riskAmt;
+        cap+=pnl;
+        trades.push({
+          sym,type,entry,sl,tp,exitPrice,
+          result,pnl,capital:cap,
+          date:TS[next],riskAmt,
+        });
+        inTrade=false;
+        tradeEntry=null;
+      }
+      continue;
+    }
+
+    // Buscar señal en vela cerrada i
+    // Verificar tendencia 1D
+    const dayIdx=Math.min(C1.length-1,Math.floor(i/6)); // aprox 6 velas 4H = 1 día
+    const bull1D=(e50_1d[dayIdx]??C1[dayIdx])>(e200_1d[dayIdx]??C1[0]);
+
+    const sig=getSignal(O,H,L,C,V,e50,e200,i);
+    if(!sig)continue;
+
+    // Filtro 1D: señal debe alinearse con tendencia diaria
+    if(sig.type==='BUY'&&!bull1D)continue;
+    if(sig.type==='SELL'&&bull1D)continue;
+
+    // Calcular posición
+    const riskAmt=cap*RISK_PER_TRADE;
+    const entry=C[i+1]; // entrada en apertura de siguiente vela
+    const sl=sig.type==='BUY'?entry*(1-SL_PCT):entry*(1+SL_PCT);
+    const tp=sig.type==='BUY'?entry*(1+TP_PCT):entry*(1-TP_PCT);
+
+    inTrade=true;
+    tradeEntry={type:sig.type,entry,sl,tp,riskAmt};
+  }
+
+  return{trades,finalCap:cap};
+}
+
+// ── Render métricas ───────────────────────────────────────────
+function renderMetrics(trades,finalCap,dates){
+  const wins=trades.filter(t=>t.result==='WIN');
+  const losses=trades.filter(t=>t.result==='LOSS');
+  const totalPnl=finalCap-INITIAL_CAPITAL;
+  const ret=(totalPnl/INITIAL_CAPITAL*100);
+  const wr=trades.length?((wins.length/trades.length)*100):0;
+
+  // Max drawdown
+  let peak=INITIAL_CAPITAL,maxDD=0;
+  let cap=INITIAL_CAPITAL;
+  for(const t of trades){
+    cap+=t.pnl;
+    if(cap>peak)peak=cap;
+    const dd=(peak-cap)/peak*100;
+    if(dd>maxDD)maxDD=dd;
+  }
+
+  // Profit factor
+  const grossWin=wins.reduce((a,t)=>a+t.pnl,0);
+  const grossLoss=Math.abs(losses.reduce((a,t)=>a+t.pnl,0));
+  const pf=grossLoss>0?(grossWin/grossLoss):grossWin>0?99:0;
+
+  const best=trades.length?Math.max(...trades.map(t=>t.pnl)):0;
+  const worst=trades.length?Math.min(...trades.map(t=>t.pnl)):0;
+
+  document.getElementById('m-final').textContent='$'+finalCap.toFixed(0);
+  document.getElementById('m-final').className='v '+(totalPnl>=0?'g':'r');
+  document.getElementById('m-ret').textContent=(ret>=0?'+':'')+ret.toFixed(2)+'%';
+  document.getElementById('m-ret').className='v '+(ret>=0?'g':'r');
+  document.getElementById('m-trades').textContent=trades.length;
+  document.getElementById('m-wr').textContent=wr.toFixed(1)+'%';
+  document.getElementById('m-wr').className='v '+(wr>=50?'g':'r');
+  document.getElementById('m-dd').textContent=maxDD.toFixed(2)+'%';
+  document.getElementById('m-best').textContent='+$'+best.toFixed(2);
+  document.getElementById('m-worst').textContent='-$'+Math.abs(worst).toFixed(2);
+  document.getElementById('m-pf').textContent=pf.toFixed(2);
+  document.getElementById('m-pf').className='v '+(pf>=1?'n':'r');
+
+  const d1=new Date(dates[0]*1000).toLocaleDateString('es',{month:'short',day:'numeric'});
+  const d2=new Date(dates[1]*1000).toLocaleDateString('es',{month:'short',day:'numeric'});
+  document.getElementById('m-period').textContent=d1+' → '+d2;
+}
+
+// ── Equity chart ──────────────────────────────────────────────
+function renderEquityChart(trades){
+  const labels=['Inicio',...trades.map(t=>fmtDate(t.date))];
+  const data=[INITIAL_CAPITAL,...trades.map(t=>t.capital)];
+  const colors=data.map((v,i)=>i===0?'rgba(77,139,255,1)':v>=data[i-1]?'rgba(5,214,140,1)':'rgba(240,61,95,1)');
+
+  if(equityChart)equityChart.destroy();
+  const ctx=document.getElementById('equity-chart').getContext('2d');
+  equityChart=new Chart(ctx,{
+    type:'line',
+    data:{
+      labels,
+      datasets:[{
+        label:'Capital',
+        data,
+        borderColor:'rgba(77,139,255,0.8)',
+        backgroundColor:'rgba(77,139,255,0.05)',
+        borderWidth:2,
+        pointBackgroundColor:colors,
+        pointRadius:trades.length<60?4:2,
+        pointHoverRadius:6,
+        fill:true,
+        tension:0.3,
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#0d1117',
+          borderColor:'#1a2235',
+          borderWidth:1,
+          titleColor:'#d4e0f0',
+          bodyColor:'#a8b8cc',
+          callbacks:{
+            label:ctx=>'Capital: $'+ctx.raw.toFixed(2),
+          }
+        }
+      },
+      scales:{
+        x:{ticks:{color:'#384556',font:{family:'IBM Plex Mono',size:9},maxTicksLimit:8},grid:{color:'#1a2235'}},
+        y:{ticks:{color:'#384556',font:{family:'IBM Plex Mono',size:9},callback:v=>'$'+v.toFixed(0)},grid:{color:'#1a2235'}},
+      }
+    }
+  });
+}
+
+// ── Pair chart ────────────────────────────────────────────────
+function renderPairChart(pairStats){
+  const labels=Object.keys(pairStats);
+  const data=labels.map(p=>pairStats[p].pnl);
+  const colors=data.map(v=>v>=0?'rgba(5,214,140,0.7)':'rgba(240,61,95,0.7)');
+  const borders=data.map(v=>v>=0?'rgba(5,214,140,1)':'rgba(240,61,95,1)');
+
+  if(pairChart)pairChart.destroy();
+  const ctx=document.getElementById('pair-chart').getContext('2d');
+  pairChart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        label:'P&L por par ($)',
+        data,
+        backgroundColor:colors,
+        borderColor:borders,
+        borderWidth:1,
+        borderRadius:4,
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#0d1117',
+          borderColor:'#1a2235',
+          borderWidth:1,
+          titleColor:'#d4e0f0',
+          bodyColor:'#a8b8cc',
+          callbacks:{label:ctx=>'P&L: $'+ctx.raw.toFixed(2)}
+        }
+      },
+      scales:{
+        x:{ticks:{color:'#a8b8cc',font:{family:'IBM Plex Mono',size:10}},grid:{color:'#1a2235'}},
+        y:{ticks:{color:'#384556',font:{family:'IBM Plex Mono',size:9},callback:v=>'$'+v.toFixed(0)},grid:{color:'#1a2235'}},
+      }
+    }
+  });
+}
+
+// ── Trades table ──────────────────────────────────────────────
+let currentFilter='all';
+function filterTrades(f,btn){
+  currentFilter=f;
+  document.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTradesTable(allTrades);
+}
+function renderTradesTable(trades){
+  let filtered=trades;
+  if(currentFilter==='win')filtered=trades.filter(t=>t.result==='WIN');
+  if(currentFilter==='loss')filtered=trades.filter(t=>t.result==='LOSS');
+  if(currentFilter==='buy')filtered=trades.filter(t=>t.type==='BUY');
+  if(currentFilter==='sell')filtered=trades.filter(t=>t.type==='SELL');
+
+  document.getElementById('trades-title').textContent=
+    `Trades — ${filtered.length} de ${trades.length} total`;
+
+  if(!filtered.length){
+    document.getElementById('trades-body').innerHTML=
+      '<div class="empty">No hay trades en este filtro</div>';
+    return;
+  }
+
+  document.getElementById('trades-body').innerHTML=filtered.map((t,i)=>{
+    const cls=t.result==='WIN'?'win':'loss';
+    const typeBadge=t.type==='BUY'
+      ?'<span class="badge-s badge-buy">BUY</span>'
+      :'<span class="badge-s badge-sell">SELL</span>';
+    const resCls=t.result==='WIN'?'win-tag':'loss-tag';
+    return`<div class="td-row ${cls}">
+      <div style="color:var(--muted)">${i+1}</div>
+      <div style="color:#fff;font-weight:700">${t.sym}</div>
+      <div>${typeBadge}</div>
+      <div>${fmtP(t.entry)}</div>
+      <div style="color:var(--sell)">${fmtP(t.sl)}</div>
+      <div style="color:var(--buy)">${fmtP(t.tp)}</div>
+      <div class="${resCls}">${t.result}</div>
+      <div class="${resCls}">${t.pnl>=0?'+':''}$${t.pnl.toFixed(2)}</div>
+      <div>$${t.capital.toFixed(0)}</div>
+      <div style="color:var(--muted);font-size:9px">${fmtDate(t.date)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Pair grid ─────────────────────────────────────────────────
+function renderPairGrid(pairStats){
+  document.getElementById('pairs-grid').innerHTML=
+    Object.entries(pairStats).map(([sym,s])=>{
+      const wr=s.total?((s.wins/s.total)*100):0;
+      const pnlCls=s.pnl>=0?'var(--buy)':'var(--sell)';
+      return`<div class="pc">
+        <div class="pc-name">${sym}</div>
+        <div class="pc-stat">Trades: <span>${s.total}</span></div>
+        <div class="pc-stat">Win Rate: <span>${wr.toFixed(0)}%</span></div>
+        <div class="pc-stat">Ganados: <span>${s.wins}</span> / Perdidos: <span>${s.losses}</span></div>
+        <div class="pc-pnl" style="color:${pnlCls}">${s.pnl>=0?'+':''}$${s.pnl.toFixed(2)}</div>
+      </div>`;
+    }).join('');
+}
+
+// ── Main backtest ─────────────────────────────────────────────
+async function runBacktest(){
+  if(running)return;
+  running=true;
+  allTrades=[];
+  equityCurve=[];
+  const btn=document.getElementById('run-btn');
+  btn.disabled=true;btn.textContent='⟳ Procesando...';
+  setStatus('Descargando datos…',true);
+  document.getElementById('progress-wrap').style.display='block';
+
+  let capital=INITIAL_CAPITAL;
+  const pairStats={};
+  PAIRS.forEach(p=>{pairStats[p]={total:0,wins:0,losses:0,pnl:0};});
+  let minDate=Infinity,maxDate=0;
+
+  for(let pi=0;pi<PAIRS.length;pi++){
+    const sym=PAIRS[pi];
+    const pct=Math.round((pi/PAIRS.length)*85);
+    setProgress(pct,`Descargando ${sym} (${pi+1}/${PAIRS.length})…`);
+    log(`Procesando ${sym}…`);
+
+    try{
+      const [kl4h,kl1d]=await Promise.all([
+        fetchKraken(KRAKEN_MAP[sym],240,SINCE-60*24*3600*10),
+        fetchKraken(KRAKEN_MAP[sym],1440,SINCE-60*24*3600*60),
+      ]);
+
+      const {trades}=simulatePair(sym,kl4h,kl1d,capital);
+
+      for(const t of trades){
+        allTrades.push(t);
+        if(t.date<minDate)minDate=t.date;
+        if(t.date>maxDate)maxDate=t.date;
+        pairStats[sym].total++;
+        if(t.result==='WIN'){pairStats[sym].wins++;pairStats[sym].pnl+=t.pnl;}
+        else{pairStats[sym].losses++;pairStats[sym].pnl+=t.pnl;}
+      }
+
+      const pairPnl=trades.reduce((a,t)=>a+t.pnl,0);
+      capital+=pairPnl;
+      log(`  ${sym}: ${trades.length} trades | P&L: ${pairPnl>=0?'+':''}$${pairPnl.toFixed(2)}`,'b');
+
+    }catch(e){
+      log(`✗ ${sym}: ${e.message}`,'w');
+    }
+    await new Promise(r=>setTimeout(r,400));
+  }
+
+  // Ordenar por fecha
+  allTrades.sort((a,b)=>a.date-b.date);
+
+  // Recalcular equity curve en orden cronológico
+  let cap=INITIAL_CAPITAL;
+  for(const t of allTrades){
+    cap+=t.pnl;
+    t.capital=cap;
+  }
+  capital=cap;
+
+  setProgress(100,'Renderizando resultados…');
+
+  if(allTrades.length===0){
+    document.getElementById('trades-body').innerHTML=
+      '<div class="empty">No se encontraron señales en el período. El mercado no cumplió las condiciones.</div>';
+    log('Sin trades en el período de backtest','w');
+  }else{
+    renderMetrics(allTrades,capital,[minDate,maxDate]);
+    renderEquityChart(allTrades);
+    renderPairChart(pairStats);
+    renderTradesTable(allTrades);
+    renderPairGrid(pairStats);
+    const wins=allTrades.filter(t=>t.result==='WIN').length;
+    const ret=((capital-INITIAL_CAPITAL)/INITIAL_CAPITAL*100);
+    log(`✔ Backtest completo — ${allTrades.length} trades | Win Rate: ${(wins/allTrades.length*100).toFixed(1)}% | Retorno: ${ret>=0?'+':''}${ret.toFixed(2)}%`,'b');
+  }
+
+  document.getElementById('progress-wrap').style.display='none';
+  setStatus('Listo',false);
+  btn.disabled=false;btn.textContent='▶ Iniciar Backtest';
+  running=false;
+}
+</script>
+</body>
+</html>
