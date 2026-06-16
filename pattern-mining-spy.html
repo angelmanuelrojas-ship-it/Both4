@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minería de Patrones — SPY · +2.5% en 20 velas</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+  :root {
+    --bg:#080b10;--surface:#0d1117;--surface2:#111820;
+    --border:#1a2235;--border2:#222e45;
+    --text:#a8b8cc;--text2:#d4e0f0;--muted:#384556;
+    --buy:#05d68c;--buy-dim:rgba(5,214,140,.10);--buy-ring:rgba(5,214,140,.28);
+    --sell:#f03d5f;--sell-dim:rgba(240,61,95,.10);
+    --neutral:#f5a623;--accent:#4d8bff;--purple:#a855f7;
+    --mono:'IBM Plex Mono','Fira Code',monospace;--sans:'Inter',system-ui,sans-serif;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;min-height:100vh;line-height:1.5}
+  ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--surface)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+  header{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:54px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:8px}
+  .logo{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.08em;color:#fff;display:flex;align-items:center;gap:8px}
+  .logo-v{background:var(--purple);color:#fff;font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px}
+  .logo-bt{background:#1a1f2e;color:var(--neutral);font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;border:1px solid rgba(245,166,35,.3)}
+  .hright{display:flex;align-items:center;gap:12px}
+  #run-btn{background:var(--purple);color:#fff;border:none;padding:0 18px;height:32px;border-radius:6px;font-size:11px;font-weight:600;font-family:var(--mono);cursor:pointer}
+  #run-btn:disabled{opacity:.35;cursor:not-allowed}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--muted)}
+  .dot.live{background:var(--buy);box-shadow:0 0 0 3px var(--buy-ring);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  #stxt{font-family:var(--mono);font-size:11px;color:var(--text)}
+  .main{padding:20px;max-width:1300px}
+
+  .info-card{background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.25);border-radius:8px;padding:12px 18px;margin-bottom:18px;font-family:var(--mono);font-size:10px;color:#c9a3ff;line-height:1.7}
+  .params-bar{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;margin-bottom:18px;display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:10px;color:var(--muted)}
+  .params-bar span{color:var(--text2)}
+
+  .summary{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+  .sc{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:13px 18px;min-width:120px;position:relative}
+  .sc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--border2)}
+  .sc.p::before{background:var(--purple)}.sc.g::before{background:var(--buy)}
+  .sc .l{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px;font-family:var(--mono)}
+  .sc .v{font-family:var(--mono);font-size:19px;font-weight:700;color:var(--text2)}
+  .sc .v.g{color:var(--buy)}
+
+  .section{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:20px}
+  .section-title{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .section-title .badge{background:var(--purple);color:#fff;font-size:8px;padding:2px 6px;border-radius:3px}
+
+  .compare-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+  .compare-table th{text-align:left;padding:8px 10px;color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border)}
+  .compare-table td{padding:9px 10px;border-bottom:1px solid var(--border)}
+  .compare-table tr:last-child td{border-bottom:none}
+  .compare-table .feat{color:#fff;font-weight:600}
+  .compare-table .succ{color:var(--buy)}
+  .compare-table .fail{color:var(--sell)}
+  .compare-table .diff-hi{background:rgba(168,85,247,.08)}
+  .diff-tag{font-size:8px;padding:1px 6px;border-radius:3px;background:rgba(168,85,247,.2);color:#c9a3ff;margin-left:6px}
+
+  .insight-box{background:rgba(5,214,140,.05);border:1px solid var(--buy-ring);border-radius:8px;padding:16px;margin-top:14px}
+  .insight-box .it{font-family:var(--mono);font-size:10px;color:var(--buy);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}
+  .insight-box p{font-size:12px;color:var(--text2);line-height:1.7}
+  .insight-box code{background:var(--surface2);padding:2px 6px;border-radius:3px;color:var(--neutral);font-family:var(--mono)}
+
+  .examples-table{max-height:300px;overflow-y:auto}
+  .th2,.td2{display:grid;grid-template-columns:90px 70px 60px 70px 50px 60px 60px 1fr;padding:7px 10px;gap:4px;font-family:var(--mono);font-size:10px}
+  .th2{background:var(--surface2);color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-size:9px;border-bottom:1px solid var(--border)}
+  .td2{border-bottom:1px solid var(--border)}
+  .td2.succ-row{border-left:3px solid var(--buy)}
+
+  .empty{text-align:center;padding:44px;color:var(--muted);font-family:var(--mono);font-size:12px}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin .7s linear infinite;margin-right:9px;vertical-align:middle}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .log-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+  .lh{padding:9px 14px;border-bottom:1px solid var(--border);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-family:var(--mono);display:flex;justify-content:space-between;background:var(--surface2)}
+  .lh button{background:none;border:none;color:var(--muted);font-family:var(--mono);font-size:9px;cursor:pointer;text-transform:uppercase}
+  #log{height:150px;overflow-y:auto;padding:10px 14px;font-family:var(--mono);font-size:11px;line-height:1.9;color:var(--muted)}
+  #log .i{color:var(--text)}#log .b{color:var(--buy)}#log .w{color:var(--neutral)}#log .e{color:var(--sell)}#log .p{color:var(--purple)}
+  #log .ts{color:var(--border2);margin-right:8px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Minería de Patrones <span class="logo-v">SPY</span><span class="logo-bt">+2.5% EN 20 VELAS</span></div>
+  <div class="hright">
+    <span class="dot" id="sdot"></span>
+    <span id="stxt">Listo</span>
+    <button id="run-btn" onclick="runAnalysis()">▶ Analizar Patrones</button>
+  </div>
+</header>
+
+<div class="main">
+
+  <div class="info-card">
+    🔬 Este análisis NO usa una estrategia predefinida. Etiqueta cada vela como "ÉXITO" si el precio subió ≥2.5% en algún punto de las siguientes 20 velas (≈3-4 días), luego compara los indicadores técnicos entre velas exitosas y no exitosas para encontrar qué condiciones se repiten más en los movimientos ganadores.
+  </div>
+
+  <div class="params-bar">
+    <div>📊 Instrumento: <span>S&P 500 (SPY)</span></div>
+    <div>🎯 Objetivo: <span>+2.5% en ≤20 velas (4H)</span></div>
+    <div>📐 Indicadores: <span>RSI, BB, Swing-Low, MACD, Estocástico, EMA50/200</span></div>
+    <div>⏱️ Período: <span>6 meses</span></div>
+  </div>
+
+  <div class="summary" id="summary" style="display:none">
+    <div class="sc p"><div class="l">Velas analizadas</div><div class="v" id="s-total">—</div></div>
+    <div class="sc g"><div class="l">Casos de Éxito</div><div class="v g" id="s-success">—</div></div>
+    <div class="sc"><div class="l">Casos sin éxito</div><div class="v" id="s-fail">—</div></div>
+    <div class="sc"><div class="l">Tasa base</div><div class="v" id="s-rate">—</div></div>
+  </div>
+
+  <div class="section" id="compare-section" style="display:none">
+    <div class="section-title">Comparación de indicadores <span class="badge">Promedio</span></div>
+    <table class="compare-table" id="compare-table"></table>
+    <div class="insight-box" id="insight-box"></div>
+  </div>
+
+  <div class="section" id="examples-section" style="display:none">
+    <div class="section-title">Ejemplos de casos exitosos (primeros 15)</div>
+    <div class="examples-table">
+      <div class="th2"><div>Fecha</div><div>Precio</div><div>RSI</div><div>EMA50/200</div><div>Stoch K</div><div>MACD</div><div>BB</div><div>Subida</div></div>
+      <div id="examples-body"></div>
+    </div>
+  </div>
+
+  <div class="log-panel">
+    <div class="lh"><span>Log</span><button onclick="document.getElementById('log').innerHTML=''">Limpiar</button></div>
+    <div id="log"><div class="empty" style="padding:14px">Presiona <strong style="color:#fff">Analizar Patrones</strong></div></div>
+  </div>
+</div>
+
+<script>
+const API_KEY = '1d0f81043a1a4bfdacc0e7b2b2eacb37';
+const SYMBOL = 'SPY';
+const TARGET_PCT = 0.025;
+const LOOKAHEAD = 20;
+const BB_LEN=20, BB_MULT=2.0;
+const RSI_LEN=14;
+const SWING_LEN=50;
+const EMA_FAST=50, EMA_SLOW=200;
+const STOCH_LEN=14, STOCH_SMOOTH=3;
+const MACD_FAST=12, MACD_SLOW=26, MACD_SIGNAL=9;
+
+function log(msg,t='i'){
+  const el=document.getElementById('log');
+  if(el.querySelector('.empty'))el.innerHTML='';
+  const ts=new Date().toLocaleTimeString('es',{hour12:false});
+  const s=document.createElement('span');
+  s.className=t;
+  s.innerHTML=`<span class="ts">[${ts}]</span>${msg}<br>`;
+  el.appendChild(s);el.scrollTop=el.scrollHeight;
+}
+function setStatus(t,live=false){
+  document.getElementById('stxt').textContent=t;
+  document.getElementById('sdot').className='dot'+(live?' live':'');
+}
+
+async function fetchTwelveData(symbol){
+  const url=`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(symbol)}&interval=4h&outputsize=5000&apikey=${API_KEY}&timezone=UTC`;
+  const r=await fetch(url);
+  if(!r.ok)throw new Error(`HTTP ${r.status}`);
+  const d=await r.json();
+  if(d.status==='error')throw new Error(d.message||'Error de API');
+  if(!d.values||!d.values.length)throw new Error('Sin datos');
+  const rows=d.values.slice().reverse();
+  const sixMonthsAgo=Date.now()/1000-(186*24*3600);
+  const TS=[],O=[],H=[],L=[],C=[];
+  for(const row of rows){
+    const ts=Math.floor(new Date(row.datetime+'Z').getTime()/1000);
+    if(ts<sixMonthsAgo)continue;
+    TS.push(ts);O.push(parseFloat(row.open));H.push(parseFloat(row.high));
+    L.push(parseFloat(row.low));C.push(parseFloat(row.close));
+  }
+  return{TS,O,H,L,C};
+}
+
+// ── Indicadores ──────────────────────────────────────────────
+function sma(arr,p,i){if(i<p-1)return null;return arr.slice(i-p+1,i+1).reduce((a,b)=>a+b,0)/p;}
+function stdev(arr,p,i){
+  if(i<p-1)return null;
+  const sl=arr.slice(i-p+1,i+1);
+  const m=sl.reduce((a,b)=>a+b,0)/p;
+  return Math.sqrt(sl.reduce((a,b)=>a+(b-m)**2,0)/p);
+}
+function emaArr(arr,p){
+  const out=new Array(arr.length).fill(null);
+  if(arr.length<p)return out;
+  const k=2/(p+1);
+  let prev=arr.slice(0,p).reduce((a,b)=>a+b,0)/p;
+  out[p-1]=prev;
+  for(let i=p;i<arr.length;i++){prev=arr[i]*k+prev*(1-k);out[i]=prev;}
+  return out;
+}
+function rsiArr(C,p){
+  const out=new Array(C.length).fill(50);
+  if(C.length<p+1)return out;
+  let avgG=0,avgL=0;
+  for(let i=1;i<=p;i++){const d=C[i]-C[i-1];if(d>0)avgG+=d;else avgL+=Math.abs(d);}
+  avgG/=p;avgL/=p;
+  out[p]=avgL===0?100:100-100/(1+avgG/avgL);
+  for(let i=p+1;i<C.length;i++){
+    const d=C[i]-C[i-1];
+    const g=d>0?d:0,l=d<0?Math.abs(d):0;
+    avgG=(avgG*(p-1)+g)/p;avgL=(avgL*(p-1)+l)/p;
+    out[i]=avgL===0?100:100-100/(1+avgG/avgL);
+  }
+  return out;
+}
+function stochArr(H,L,C,p,smooth){
+  const k=new Array(C.length).fill(50);
+  for(let i=p-1;i<C.length;i++){
+    const hh=Math.max(...H.slice(i-p+1,i+1));
+    const ll=Math.min(...L.slice(i-p+1,i+1));
+    k[i]=hh===ll?50:((C[i]-ll)/(hh-ll))*100;
+  }
+  const d=new Array(C.length).fill(50);
+  for(let i=smooth-1;i<k.length;i++){
+    d[i]=k.slice(i-smooth+1,i+1).reduce((a,b)=>a+b,0)/smooth;
+  }
+  return{k,d};
+}
+function macdArr(C,fast,slow,signal){
+  const emaFast=emaArr(C,fast);
+  const emaSlow=emaArr(C,slow);
+  const macdLine=C.map((_,i)=>(emaFast[i]!=null&&emaSlow[i]!=null)?emaFast[i]-emaSlow[i]:null);
+  const validMacd=macdLine.filter(v=>v!=null);
+  const sigRaw=emaArr(validMacd,signal);
+  const sigLine=new Array(C.length).fill(null);
+  let vi=0;
+  for(let i=0;i<C.length;i++){
+    if(macdLine[i]!=null){
+      sigLine[i]=sigRaw[vi]!=null?sigRaw[vi]:null;
+      vi++;
+    }
+  }
+  return{macdLine,sigLine};
+}
+function swingLowAt(L,i,len=SWING_LEN){return Math.min(...L.slice(Math.max(0,i-len+1),i+1));}
+function atrAt(H,L,C,i,p=14){
+  if(i<1)return H[i]-L[i];
+  let sum=0,cnt=0;
+  for(let j=Math.max(1,i-p+1);j<=i;j++){
+    sum+=Math.max(H[j]-L[j],Math.abs(H[j]-C[j-1]),Math.abs(L[j]-C[j-1]));
+    cnt++;
+  }
+  return cnt?sum/cnt:H[i]-L[i];
+}
+
+function buildFeatures(O,H,L,C){
+  const n=C.length;
+  const rsi=rsiArr(C,RSI_LEN);
+  const ema50=emaArr(C,EMA_FAST);
+  const ema200=emaArr(C,EMA_SLOW);
+  const{k:stochK,d:stochD}=stochArr(H,L,C,STOCH_LEN,STOCH_SMOOTH);
+  const{macdLine,sigLine}=macdArr(C,MACD_FAST,MACD_SLOW,MACD_SIGNAL);
+
+  const features=[];
+  const minI=Math.max(BB_LEN,SWING_LEN,EMA_SLOW,RSI_LEN+1);
+  for(let i=minI;i<n;i++){
+    const basis=sma(C,BB_LEN,i);
+    const sd=stdev(C,BB_LEN,i);
+    const lowerBB=basis-BB_MULT*sd;
+    const upperBB=basis+BB_MULT*sd;
+    const bbPos=(C[i]-lowerBB)/(upperBB-lowerBB); // 0=banda inferior, 1=banda superior
+    const lastSwing=swingLowAt(L,i);
+    const distSwing=(C[i]-lastSwing)/lastSwing*100; // % sobre el swing low
+    const emaTrend=(ema50[i]!=null&&ema200[i]!=null)?(ema50[i]>ema200[i]?1:0):null;
+    const atr=atrAt(H,L,C,i,14);
+
+    features.push({
+      idx:i,
+      rsi:rsi[i],
+      bbPos,
+      distSwing,
+      emaTrend,
+      ema50:ema50[i],ema200:ema200[i],
+      stochK:stochK[i],stochD:stochD[i],
+      macd:macdLine[i],macdSig:sigLine[i],
+      macdCross:(macdLine[i]!=null&&sigLine[i]!=null)?(macdLine[i]>sigLine[i]?1:0):null,
+      atrPct:atr/C[i]*100,
+      price:C[i],
+    });
+  }
+  return features;
+}
+
+function labelOutcomes(features,C,TS){
+  const n=features.length;
+  for(let fi=0;fi<n;fi++){
+    const i=features[fi].idx;
+    const entryPrice=C[i];
+    let success=false, maxGainPct=0, hitAt=null;
+    for(let j=i+1;j<=Math.min(i+LOOKAHEAD,C.length-1);j++){
+      const gain=(C[j]-entryPrice)/entryPrice*100;
+      if(gain>maxGainPct)maxGainPct=gain;
+      if(gain>=TARGET_PCT*100&&!success){success=true;hitAt=j-i;}
+    }
+    features[fi].success=success;
+    features[fi].maxGainPct=maxGainPct;
+    features[fi].hitAt=hitAt;
+    features[fi].ts=TS[i];
+  }
+  return features;
+}
+
+function avg(arr){const v=arr.filter(x=>x!=null&&!isNaN(x));return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;}
+function pct(arr,cond){const v=arr.filter(cond);return arr.length?v.length/arr.length*100:0;}
+
+function renderComparison(features){
+  const succ=features.filter(f=>f.success);
+  const fail=features.filter(f=>!f.success);
+
+  const rows=[
+    {label:'RSI(14) promedio',succ:avg(succ.map(f=>f.rsi)),fail:avg(fail.map(f=>f.rsi)),fmt:v=>v.toFixed(1)},
+    {label:'% velas con RSI < 30',succ:pct(succ,f=>f.rsi<30),fail:pct(fail,f=>f.rsi<30),fmt:v=>v.toFixed(1)+'%'},
+    {label:'% velas con RSI < 40',succ:pct(succ,f=>f.rsi<40),fail:pct(fail,f=>f.rsi<40),fmt:v=>v.toFixed(1)+'%'},
+    {label:'Posición en BB (0=inf,1=sup)',succ:avg(succ.map(f=>f.bbPos)),fail:avg(fail.map(f=>f.bbPos)),fmt:v=>v.toFixed(2)},
+    {label:'% velas tocando BB inferior (<0.1)',succ:pct(succ,f=>f.bbPos<0.1),fail:pct(fail,f=>f.bbPos<0.1),fmt:v=>v.toFixed(1)+'%'},
+    {label:'Distancia % sobre swing-low 50',succ:avg(succ.map(f=>f.distSwing)),fail:avg(fail.map(f=>f.distSwing)),fmt:v=>v.toFixed(2)+'%'},
+    {label:'% velas cerca de swing-low (<1%)',succ:pct(succ,f=>f.distSwing<1),fail:pct(fail,f=>f.distSwing<1),fmt:v=>v.toFixed(1)+'%'},
+    {label:'% velas con EMA50 > EMA200 (alcista)',succ:pct(succ,f=>f.emaTrend===1),fail:pct(fail,f=>f.emaTrend===1),fmt:v=>v.toFixed(1)+'%'},
+    {label:'Estocástico %K promedio',succ:avg(succ.map(f=>f.stochK)),fail:avg(fail.map(f=>f.stochK)),fmt:v=>v.toFixed(1)},
+    {label:'% velas con Stoch K < 20',succ:pct(succ,f=>f.stochK<20),fail:pct(fail,f=>f.stochK<20),fmt:v=>v.toFixed(1)+'%'},
+    {label:'% velas con MACD > señal (cruce alcista)',succ:pct(succ,f=>f.macdCross===1),fail:pct(fail,f=>f.macdCross===1),fmt:v=>v.toFixed(1)+'%'},
+    {label:'ATR % promedio (volatilidad)',succ:avg(succ.map(f=>f.atrPct)),fail:avg(fail.map(f=>f.atrPct)),fmt:v=>v.toFixed(2)+'%'},
+  ];
+
+  let html='<tr><th>Indicador</th><th>Casos ÉXITO</th><th>Casos sin éxito</th><th>Diferencia</th></tr>';
+  const significant=[];
+  for(const r of rows){
+    if(r.succ==null||r.fail==null)continue;
+    const diff=r.succ-r.fail;
+    const diffPct=r.fail!==0?Math.abs(diff/r.fail*100):0;
+    const isHigh=diffPct>15;
+    if(isHigh)significant.push({...r,diff,diffPct});
+    html+=`<tr class="${isHigh?'diff-hi':''}">
+      <td class="feat">${r.label}</td>
+      <td class="succ">${r.fmt(r.succ)}</td>
+      <td class="fail">${r.fmt(r.fail)}</td>
+      <td>${diff>=0?'+':''}${r.fmt(diff)}${isHigh?'<span class="diff-tag">DIFERENCIA NOTABLE</span>':''}</td>
+    </tr>`;
+  }
+  document.getElementById('compare-table').innerHTML=html;
+
+  significant.sort((a,b)=>b.diffPct-a.diffPct);
+  let insightHtml='<div class="it">📌 Hallazgos principales</div>';
+  if(significant.length===0){
+    insightHtml+='<p>No se encontraron diferencias notables (&gt;15%) entre los casos exitosos y no exitosos con los indicadores analizados. Esto sugiere que estos indicadores por sí solos no predicen bien un movimiento de +2.5% en 20 velas para SPY en este período — puede que el movimiento sea más aleatorio de lo esperado, o que se necesiten otros indicadores/condiciones.</p>';
+  }else{
+    insightHtml+='<p>Las condiciones que más se diferencian entre velas que subieron 2.5% y las que no:</p><ul style="margin:10px 0 0 18px;line-height:2">';
+    for(const s of significant.slice(0,5)){
+      insightHtml+=`<li><code>${s.label}</code>: ${s.fmt(s.succ)} en éxitos vs ${s.fmt(s.fail)} en no-éxitos</li>`;
+    }
+    insightHtml+='</ul>';
+  }
+  document.getElementById('insight-box').innerHTML=insightHtml;
+}
+
+function renderExamples(features){
+  const succ=features.filter(f=>f.success).slice(0,15);
+  document.getElementById('examples-body').innerHTML=succ.map(f=>{
+    const d=new Date(f.ts*1000).toLocaleDateString('es',{month:'short',day:'numeric',year:'2-digit'});
+    return `<div class="td2 succ-row">
+      <div>${d}</div>
+      <div>${f.price.toFixed(2)}</div>
+      <div>${f.rsi.toFixed(1)}</div>
+      <div>${f.emaTrend===1?'Alcista':'Bajista'}</div>
+      <div>${f.stochK.toFixed(0)}</div>
+      <div>${f.macdCross===1?'+':'-'}</div>
+      <div>${f.bbPos!=null?f.bbPos.toFixed(2):'—'}</div>
+      <div style="color:var(--buy)">+${f.maxGainPct.toFixed(2)}% (vela ${f.hitAt})</div>
+    </div>`;
+  }).join('');
+}
+
+async function runAnalysis(){
+  const btn=document.getElementById('run-btn');
+  btn.disabled=true;btn.textContent='⟳ Analizando...';
+  setStatus('Descargando datos…',true);
+
+  try{
+    log(`Descargando ${SYMBOL} de Twelve Data…`,'p');
+    const{TS,O,H,L,C}=await fetchTwelveData(SYMBOL);
+    log(`✔ ${C.length} velas 4H descargadas`,'b');
+
+    log('Calculando indicadores (RSI, BB, Swing-Low, EMA50/200, Estocástico, MACD)…');
+    let features=buildFeatures(O,H,L,C);
+    log(`✔ ${features.length} velas con indicadores completos`,'b');
+
+    log(`Etiquetando casos: ¿subió ≥2.5% en las siguientes ${LOOKAHEAD} velas?`);
+    features=labelOutcomes(features,C,TS);
+
+    const succCount=features.filter(f=>f.success).length;
+    const failCount=features.length-succCount;
+    const rate=(succCount/features.length*100).toFixed(1);
+
+    document.getElementById('summary').style.display='flex';
+    document.getElementById('s-total').textContent=features.length;
+    document.getElementById('s-success').textContent=succCount;
+    document.getElementById('s-fail').textContent=failCount;
+    document.getElementById('s-rate').textContent=rate+'%';
+
+    log(`✔ ${succCount} casos de éxito (${rate}%), ${failCount} sin éxito`,'b');
+    log('Comparando indicadores entre ambos grupos…','p');
+
+    document.getElementById('compare-section').style.display='block';
+    renderComparison(features);
+
+    document.getElementById('examples-section').style.display='block';
+    renderExamples(features);
+
+    log('✔ Análisis completo','b');
+    setStatus('Listo',false);
+  }catch(e){
+    log(`✗ Error: ${e.message}`,'e');
+    setStatus('Error',false);
+  }
+
+  btn.disabled=false;btn.textContent='▶ Analizar Patrones';
+}
+</script>
+</body>
+</html>
