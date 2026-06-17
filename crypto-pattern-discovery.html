@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto — Descubrimiento de Patrones</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+:root {
+  --bg:#080b10;--surface:#0d1117;--surface2:#111820;
+  --border:#1a2235;--border2:#222e45;
+  --text:#a8b8cc;--text2:#d4e0f0;--muted:#384556;
+  --buy:#05d68c;--buy-dim:rgba(5,214,140,.10);--buy-ring:rgba(5,214,140,.28);
+  --sell:#f03d5f;--sell-dim:rgba(240,61,95,.10);
+  --neutral:#f5a623;--accent:#4d8bff;--purple:#a855f7;
+  --mono:'IBM Plex Mono','Fira Code',monospace;--sans:'Inter',system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;min-height:100vh;line-height:1.5}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--surface)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:8px}
+.logo{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:.06em;color:#fff;display:flex;align-items:center;gap:8px}
+.logo-tag{background:#1a472a;color:#05d68c;font-size:9px;font-weight:600;padding:2px 7px;border-radius:3px;border:1px solid rgba(5,214,140,.3)}
+.main{padding:16px;max-width:1400px;margin:0 auto}
+.section{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:14px}
+.section-title{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;font-family:var(--sans)}
+.field input,.field select{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text2);padding:9px 10px;border-radius:6px;font-family:var(--mono);font-size:13px}
+.field input:focus,.field select:focus{outline:none;border-color:var(--accent)}
+.pairs-toggle{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.pair-chip{background:var(--surface2);border:1px solid var(--border2);color:var(--muted);padding:5px 11px;border-radius:14px;font-family:var(--mono);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;user-select:none}
+.pair-chip.active{background:var(--buy-dim);color:var(--buy);border-color:var(--buy-ring)}
+#run-btn{background:var(--accent);color:#fff;border:none;padding:13px 22px;border-radius:8px;font-size:13px;font-weight:600;font-family:var(--mono);cursor:pointer;width:100%;margin-top:8px;transition:background .15s}
+#run-btn:hover{background:#5f9bff}
+#run-btn:disabled{opacity:.4;cursor:not-allowed}
+.status-line{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px;display:flex;align-items:center;gap:6px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.dot.live{background:var(--buy);box-shadow:0 0 0 3px var(--buy-ring);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.progress-bar{height:6px;background:var(--border2);border-radius:3px;overflow:hidden;margin-top:8px;display:none}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--buy));border-radius:3px;transition:width .25s;width:0%}
+.summary-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:14px;font-size:13px}
+.summary-box b{color:#fff}
+.compare-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;margin-top:8px}
+.compare-table th{text-align:left;color:var(--muted);text-transform:uppercase;font-size:9px;letter-spacing:.06em;padding:8px 10px;border-bottom:1px solid var(--border2);background:var(--surface)}
+.compare-table td{padding:8px 10px;border-bottom:1px solid var(--border)}
+.compare-table tr:last-child td{border-bottom:none}
+.delta-pos{color:var(--buy);font-weight:700}
+.delta-neg{color:var(--sell);font-weight:700}
+.delta-neutral{color:var(--muted)}
+.warn-box{background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.3);border-radius:8px;padding:12px 14px;margin-top:14px;font-size:12px;color:#f5a623;display:none}
+.warn-box.show{display:block}
+.warn-box b{color:#fff}
+.empty{text-align:center;padding:34px;color:var(--muted);font-family:var(--mono);font-size:12px}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.note{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.6}
+.pairs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:14px}
+.pc{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:11px 13px}
+.pc-name{font-family:var(--mono);font-weight:700;font-size:13px;color:#fff;margin-bottom:5px}
+.pc-stat{font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.7}
+.pc-stat span{color:var(--text2)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Crypto — Descubrimiento de Patrones <span class="logo-tag">10 pares · 4H</span></div>
+</header>
+
+<div class="main">
+
+  <div class="section">
+    <div class="section-title">Pares (Kraken)</div>
+    <div class="pairs-toggle" id="pairs-toggle"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Definición de "subida relevante"</div>
+    <div class="grid">
+      <div class="field"><label>Rango histórico</label>
+        <select id="p-range">
+          <option value="90">3 meses</option>
+          <option value="180" selected>6 meses</option>
+          <option value="365">1 año</option>
+          <option value="730">2 años</option>
+        </select>
+      </div>
+      <div class="field"><label>% subida mínima</label><input type="number" id="p-thresholdPct" value="2" step="0.1"></div>
+      <div class="field"><label>Horizonte (velas adelante)</label><input type="number" id="p-horizonN" value="6"></div>
+      <div class="field"><label>Excluir velas extremas (% 1 vela)</label><input type="number" id="p-extremeFilter" value="8" step="0.5"></div>
+    </div>
+    <div class="note">Se marca cada vela según si el precio sube al menos el % indicado en algún momento dentro de las próximas N velas. Señales consecutivas (streaks) cuentan como un solo evento independiente, no una vez por vela, para no inflar el conteo.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Indicadores a analizar</div>
+    <div class="grid">
+      <div class="field"><label>Período RSI</label><input type="number" id="p-rsiPeriod" value="14"></div>
+      <div class="field"><label>Período Bollinger</label><input type="number" id="p-bbLen" value="20"></div>
+      <div class="field"><label>Desviaciones Bollinger</label><input type="number" id="p-bbMult" value="2" step="0.1"></div>
+      <div class="field"><label>Período EMA corta</label><input type="number" id="p-emaShort" value="20"></div>
+      <div class="field"><label>Período EMA larga</label><input type="number" id="p-emaLong" value="50"></div>
+      <div class="field"><label>Período ATR</label><input type="number" id="p-atrPeriod" value="14"></div>
+      <div class="field"><label>Período volumen promedio</label><input type="number" id="p-volPeriod" value="20"></div>
+    </div>
+    <button id="run-btn" onclick="runDiscovery()">▶ Descargar datos y analizar patrones</button>
+    <div class="status-line"><span class="dot" id="sdot"></span><span id="stxt">Listo.</span></div>
+    <div class="progress-bar" id="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  </div>
+
+  <div class="section" id="results-section" style="display:none">
+    <div class="section-title">Resultado del análisis</div>
+    <div class="summary-box" id="summary-box"></div>
+    <table class="compare-table" id="compare-table"></table>
+    <div class="warn-box" id="warn-box"></div>
+    <div class="pairs-grid" id="pairs-grid"></div>
+    <div class="note">Esto es un análisis exploratorio de correlación, no una estrategia con reglas de entrada/salida todavía. Un indicador "más bajo antes de la subida" sugiere que podría ser parte de una señal útil, pero hace falta validarlo con un backtester real antes de confiar en él. El pasado no garantiza resultados futuros — no es asesoría financiera.</div>
+  </div>
+
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// MINERÍA DE PATRONES — CRYPTO (10 pares Kraken, 4H)
+// Calcula un set de indicadores en cada vela histórica, marca
+// cuáles tuvieron una "subida relevante" en N velas adelante, y
+// compara los promedios de cada indicador entre el grupo que
+// subió vs el grupo de control (resto), para identificar qué
+// condiciones preceden a movimientos alcistas. Deduplicación de
+// streaks consecutivos para no inflar el conteo de eventos.
+// ════════════════════════════════════════════════════════════
+
+const KRAKEN_MAP = {
+  BTC:'XBTUSD', BNB:'BNBUSD', DOT:'DOTUSD', XRP:'XRPUSD',
+  ARB:'ARBUSD', SUI:'SUIUSD', TON:'TONUSD', ATOM:'ATOMUSD',
+  LINK:'LINKUSD', AVAX:'AVAXUSD',
+};
+const ALL_PAIRS = Object.keys(KRAKEN_MAP);
+let activePairs = new Set(ALL_PAIRS);
+let running = false;
+
+function renderPairChips(){
+  const el = document.getElementById('pairs-toggle');
+  el.innerHTML = ALL_PAIRS.map(p =>
+    `<div class="pair-chip active" data-pair="${p}" onclick="togglePair('${p}')">${p}</div>`
+  ).join('');
+}
+function togglePair(p){
+  const chip = document.querySelector(`.pair-chip[data-pair="${p}"]`);
+  if(activePairs.has(p)){ activePairs.delete(p); chip.classList.remove('active'); }
+  else { activePairs.add(p); chip.classList.add('active'); }
+}
+renderPairChips();
+
+function setStatus(t, live=false){
+  document.getElementById('stxt').textContent = t;
+  document.getElementById('sdot').className = 'dot' + (live ? ' live' : '');
+}
+function setProgress(pct){
+  const bar = document.getElementById('progress-bar');
+  bar.style.display = pct > 0 && pct < 100 ? 'block' : 'none';
+  document.getElementById('progress-fill').style.width = pct + '%';
+}
+
+// ---------- descarga Kraken con paginación ----------
+async function fetchKraken(pair, interval, since){
+  let allCandles = [];
+  let currentSince = since;
+  const nowTs = Math.floor(Date.now()/1000);
+  let guard = 0;
+  while(currentSince < nowTs && guard < 40){
+    guard++;
+    const url = `https://api.kraken.com/0/public/OHLC?pair=${pair}&interval=${interval}&since=${currentSince}`;
+    const r = await Promise.race([
+      fetch(url),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('Timeout')),25000))
+    ]);
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    if(d.error && d.error.length) throw new Error(d.error[0]);
+    const key = Object.keys(d.result).find(k=>k!=='last');
+    if(!key) throw new Error('Sin datos');
+    const batch = d.result[key];
+    if(!batch.length) break;
+    allCandles.push(...batch);
+    const lastTs = parseInt(batch[batch.length-1][0]);
+    if(lastTs <= currentSince) break;
+    currentSince = lastTs + 1;
+    if(batch.length < 5) break;
+    await new Promise(r=>setTimeout(r,250));
+  }
+  const seen = new Set();
+  const deduped = [];
+  for(const c of allCandles){
+    if(seen.has(c[0])) continue;
+    seen.add(c[0]);
+    deduped.push(c);
+  }
+  deduped.sort((a,b)=>a[0]-b[0]);
+  return deduped;
+}
+
+// ---------- indicadores ----------
+function sma(arr,p,i){ if(i<p-1) return null; let s=0; for(let j=i-p+1;j<=i;j++) s+=arr[j]; return s/p; }
+function stdev(arr,p,i){
+  if(i<p-1) return null;
+  const m = sma(arr,p,i);
+  let s=0; for(let j=i-p+1;j<=i;j++) s += (arr[j]-m)**2;
+  return Math.sqrt(s/p);
+}
+function rsiArr(C,p){
+  const out = new Array(C.length).fill(null);
+  if(C.length < p+1) return out;
+  let avgG=0, avgL=0;
+  for(let i=1;i<=p;i++){ const d=C[i]-C[i-1]; if(d>0) avgG+=d; else avgL+=Math.abs(d); }
+  avgG/=p; avgL/=p;
+  out[p] = avgL===0 ? 100 : 100-100/(1+avgG/avgL);
+  for(let i=p+1;i<C.length;i++){
+    const d=C[i]-C[i-1];
+    const g = d>0?d:0, l = d<0?Math.abs(d):0;
+    avgG=(avgG*(p-1)+g)/p; avgL=(avgL*(p-1)+l)/p;
+    out[i] = avgL===0 ? 100 : 100-100/(1+avgG/avgL);
+  }
+  return out;
+}
+function emaArr(values, period){
+  const ema = new Array(values.length).fill(null);
+  const multiplier = 2/(period+1);
+  if(values.length < period) return ema;
+  let seed = 0;
+  for(let i=0;i<period;i++) seed += values[i];
+  ema[period-1] = seed/period;
+  for(let i=period;i<values.length;i++){
+    ema[i] = (values[i]-ema[i-1])*multiplier + ema[i-1];
+  }
+  return ema;
+}
+function atrArr(H,L,C,period){
+  const tr = new Array(C.length).fill(null);
+  for(let i=0;i<C.length;i++){
+    if(i===0){ tr[i] = H[i]-L[i]; continue; }
+    tr[i] = Math.max(H[i]-L[i], Math.abs(H[i]-C[i-1]), Math.abs(L[i]-C[i-1]));
+  }
+  const atr = new Array(C.length).fill(null);
+  if(C.length < period) return atr;
+  let seed = 0;
+  for(let i=0;i<period;i++) seed += tr[i];
+  atr[period-1] = seed/period;
+  for(let i=period;i<C.length;i++){
+    atr[i] = (atr[i-1]*(period-1) + tr[i]) / period;
+  }
+  return atr;
+}
+function macdArr(C, fast=12, slow=26, signalP=9){
+  const emaFast = emaArr(C, fast);
+  const emaSlow = emaArr(C, slow);
+  const macdLine = C.map((_,i)=> (emaFast[i]!=null && emaSlow[i]!=null) ? emaFast[i]-emaSlow[i] : null);
+  const validIdx = [];
+  const validVals = [];
+  macdLine.forEach((v,i)=>{ if(v!=null){ validIdx.push(i); validVals.push(v); } });
+  const signalOnValid = emaArr(validVals, signalP);
+  const signalLine = new Array(C.length).fill(null);
+  validIdx.forEach((origIdx, k)=>{ signalLine[origIdx] = signalOnValid[k]; });
+  const histogram = C.map((_,i)=> (macdLine[i]!=null && signalLine[i]!=null) ? macdLine[i]-signalLine[i] : null);
+  return { macdLine, signalLine, histogram };
+}
+function volRatioArr(V, period){
+  const out = new Array(V.length).fill(null);
+  for(let i=0;i<V.length;i++){
+    const avg = sma(V, period, i);
+    if(avg==null || avg===0) continue;
+    out[i] = V[i] / avg;
+  }
+  return out;
+}
+
+// ---------- minería ----------
+function markRelevantMoves(C, horizonN, thresholdPct){
+  const n = C.length;
+  const isRelevant = new Array(n).fill(false);
+  for(let i=0;i<n-horizonN;i++){
+    const base = C[i];
+    let maxFuture = -Infinity;
+    for(let k=1;k<=horizonN;k++) maxFuture = Math.max(maxFuture, C[i+k]);
+    isRelevant[i] = (maxFuture - base) / base * 100 >= thresholdPct;
+  }
+  return isRelevant;
+}
+function dedupeConsecutive(boolArr){
+  const deduped = new Array(boolArr.length).fill(false);
+  for(let i=0;i<boolArr.length;i++){
+    if(boolArr[i] && !boolArr[i-1]) deduped[i] = true;
+  }
+  return deduped;
+}
+
+// ---------- análisis por par ----------
+function analyzePair(sym, kl, params, sinceTs){
+  const O = kl.map(k=>parseFloat(k[1]));
+  const H = kl.map(k=>parseFloat(k[2]));
+  const L = kl.map(k=>parseFloat(k[3]));
+  const C = kl.map(k=>parseFloat(k[4]));
+  const V = kl.map(k=>parseFloat(k[6]));
+  const TS = kl.map(k=>parseInt(k[0]));
+  const n = C.length;
+
+  // filtro de velas extremas (movimiento de 1 vela mayor al umbral, en valor absoluto)
+  const isExtreme = new Array(n).fill(false);
+  for(let i=1;i<n;i++){
+    const pctChange = Math.abs((C[i]-C[i-1])/C[i-1]*100);
+    if(pctChange >= params.extremeFilter) isExtreme[i] = true;
+  }
+
+  const rsi = rsiArr(C, params.rsiPeriod);
+  const basis = C.map((_,i)=>sma(C, params.bbLen, i));
+  const sd = C.map((_,i)=>stdev(C, params.bbLen, i));
+  const lowerBB = C.map((_,i)=> (basis[i]!=null && sd[i]!=null) ? basis[i]-params.bbMult*sd[i] : null);
+  const upperBB = C.map((_,i)=> (basis[i]!=null && sd[i]!=null) ? basis[i]+params.bbMult*sd[i] : null);
+  const bandDistPct = C.map((_,i)=>{
+    if(lowerBB[i]==null || upperBB[i]==null) return null;
+    const width = upperBB[i]-lowerBB[i];
+    if(width<=0) return null;
+    return (C[i]-lowerBB[i])/width*100;
+  });
+  const emaShort = emaArr(C, params.emaShort);
+  const emaLong = emaArr(C, params.emaLong);
+  const emaShortPosPct = C.map((_,i)=> emaShort[i]!=null ? (C[i]-emaShort[i])/emaShort[i]*100 : null);
+  const emaLongPosPct = C.map((_,i)=> emaLong[i]!=null ? (C[i]-emaLong[i])/emaLong[i]*100 : null);
+  const atr = atrArr(H,L,C,params.atrPeriod);
+  const atrPct = C.map((_,i)=> atr[i]!=null ? atr[i]/C[i]*100 : null); // volatilidad relativa
+  const { histogram: macdHist } = macdArr(C);
+  const volRatio = volRatioArr(V, params.volPeriod);
+
+  const isRelevantRaw = markRelevantMoves(C, params.horizonN, params.thresholdPct);
+  const isRelevant = dedupeConsecutive(isRelevantRaw);
+
+  const minI = Math.max(params.bbLen, params.emaLong, params.rsiPeriod+1, params.atrPeriod+1, 35, params.volPeriod);
+  const rows = [];
+  for(let i=minI; i<n-params.horizonN; i++){
+    if(TS[i] < sinceTs) continue;
+    if(isExtreme[i]) continue;
+    if(rsi[i]==null || bandDistPct[i]==null || emaShortPosPct[i]==null || emaLongPosPct[i]==null || atrPct[i]==null || macdHist[i]==null || volRatio[i]==null) continue;
+    rows.push({
+      sym, ts: TS[i], relevant: isRelevant[i],
+      rsi: rsi[i], bandDistPct: bandDistPct[i],
+      emaShortPosPct: emaShortPosPct[i], emaLongPosPct: emaLongPosPct[i],
+      atrPct: atrPct[i], macdHist: macdHist[i], volRatio: volRatio[i]
+    });
+  }
+  return rows;
+}
+
+function avg(arr){ return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null; }
+
+function renderResults(allRows, params, pairCounts){
+  const relevantRows = allRows.filter(r=>r.relevant);
+  const controlRows = allRows.filter(r=>!r.relevant);
+
+  const fields = [
+    { key:'rsi', label:`RSI(${params.rsiPeriod})`, decimals:1 },
+    { key:'bandDistPct', label:'% Dist. a banda inf. Bollinger (0=banda, 100=banda sup.)', decimals:1 },
+    { key:'emaShortPosPct', label:`Posición vs EMA${params.emaShort} (%)`, decimals:2 },
+    { key:'emaLongPosPct', label:`Posición vs EMA${params.emaLong} (%)`, decimals:2 },
+    { key:'atrPct', label:'Volatilidad relativa (ATR % del precio)', decimals:3 },
+    { key:'macdHist', label:'MACD histograma', decimals:4 },
+    { key:'volRatio', label:'Volumen relativo (1.0=normal)', decimals:2 },
+  ];
+
+  const summaryBox = document.getElementById('summary-box');
+  summaryBox.innerHTML = `
+    <b>${relevantRows.length}</b> eventos de subida relevante (≥${params.thresholdPct}% en ${params.horizonN} velas) detectados,
+    de <b>${allRows.length}</b> velas analizadas en total (${controlRows.length} en el grupo de control).
+    Esto representa una tasa base de <b>${(relevantRows.length/allRows.length*100).toFixed(1)}%</b> de las velas.
+  `;
+
+  const table = document.getElementById('compare-table');
+  let html = `<tr><th>Indicador</th><th>Antes de subida</th><th>Grupo control</th><th>Diferencia</th></tr>`;
+  for(const f of fields){
+    const avgRel = avg(relevantRows.map(r=>r[f.key]));
+    const avgCtrl = avg(controlRows.map(r=>r[f.key]));
+    if(avgRel==null || avgCtrl==null) continue;
+    const delta = avgRel - avgCtrl;
+    const deltaPct = avgCtrl !== 0 ? (delta/Math.abs(avgCtrl)*100) : 0;
+    const deltaClass = Math.abs(deltaPct) < 5 ? 'delta-neutral' : (delta < 0 ? 'delta-neg' : 'delta-pos');
+    html += `<tr>
+      <td>${f.label}</td>
+      <td>${avgRel.toFixed(f.decimals)}</td>
+      <td>${avgCtrl.toFixed(f.decimals)}</td>
+      <td class="${deltaClass}">${delta>=0?'+':''}${delta.toFixed(f.decimals)} (${deltaPct>=0?'+':''}${deltaPct.toFixed(0)}%)</td>
+    </tr>`;
+  }
+  table.innerHTML = html;
+
+  const warnBox = document.getElementById('warn-box');
+  if(relevantRows.length < 50){
+    warnBox.className = 'warn-box show';
+    warnBox.innerHTML = `<b>⚠ Muestra chica (${relevantRows.length} eventos).</b> Con menos de 50 eventos, los promedios pueden no ser representativos. Considera ampliar el rango histórico, bajar el % de subida mínima, o agregar más pares.`;
+  } else {
+    warnBox.className = 'warn-box';
+  }
+
+  const pairsGrid = document.getElementById('pairs-grid');
+  pairsGrid.innerHTML = Object.entries(pairCounts).filter(([,c])=>c.total>0).map(([sym,c])=>`
+    <div class="pc">
+      <div class="pc-name">${sym}</div>
+      <div class="pc-stat">Velas analizadas: <span>${c.total}</span></div>
+      <div class="pc-stat">Eventos relevantes: <span>${c.relevant}</span> (${(c.relevant/c.total*100).toFixed(1)}%)</div>
+    </div>
+  `).join('');
+}
+
+async function runDiscovery(){
+  if(running) return;
+  if(activePairs.size===0){ alert('Selecciona al menos un par.'); return; }
+  running = true;
+
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true; btn.textContent = '⟳ Procesando...';
+  setStatus('Descargando datos…', true);
+  document.getElementById('results-section').style.display = 'block';
+  document.getElementById('summary-box').innerHTML = '<span class="spin"></span>Cargando pares…';
+  document.getElementById('compare-table').innerHTML = '';
+
+  const params = {
+    rangeDays: parseInt(document.getElementById('p-range').value),
+    thresholdPct: parseFloat(document.getElementById('p-thresholdPct').value),
+    horizonN: parseInt(document.getElementById('p-horizonN').value),
+    extremeFilter: parseFloat(document.getElementById('p-extremeFilter').value),
+    rsiPeriod: parseInt(document.getElementById('p-rsiPeriod').value),
+    bbLen: parseInt(document.getElementById('p-bbLen').value),
+    bbMult: parseFloat(document.getElementById('p-bbMult').value),
+    emaShort: parseInt(document.getElementById('p-emaShort').value),
+    emaLong: parseInt(document.getElementById('p-emaLong').value),
+    atrPeriod: parseInt(document.getElementById('p-atrPeriod').value),
+    volPeriod: parseInt(document.getElementById('p-volPeriod').value),
+  };
+
+  const sinceTs = Math.floor(Date.now()/1000) - params.rangeDays*24*3600;
+  const warmupDays = Math.max(60, params.emaLong*4/24 + 20);
+  const fetchSince = sinceTs - warmupDays*24*3600;
+
+  const pairsToRun = ALL_PAIRS.filter(p=>activePairs.has(p));
+  let allRows = [];
+  const pairCounts = {};
+  pairsToRun.forEach(p=>{ pairCounts[p] = {total:0, relevant:0}; });
+
+  for(let pi=0; pi<pairsToRun.length; pi++){
+    const sym = pairsToRun[pi];
+    setProgress((pi/pairsToRun.length)*90);
+    setStatus(`Descargando ${sym} (${pi+1}/${pairsToRun.length})…`, true);
+    try{
+      const kl = await fetchKraken(KRAKEN_MAP[sym], 240, fetchSince);
+      const rows = analyzePair(sym, kl, params, sinceTs);
+      allRows.push(...rows);
+      pairCounts[sym].total = rows.length;
+      pairCounts[sym].relevant = rows.filter(r=>r.relevant).length;
+    }catch(e){
+      console.log(`✗ ${sym}: ${e.message}`);
+    }
+    await new Promise(r=>setTimeout(r,300));
+  }
+
+  setProgress(100);
+
+  if(allRows.length === 0){
+    document.getElementById('summary-box').innerHTML = '<b>Sin datos.</b> No se pudo descargar o analizar ningún par con esta configuración.';
+  } else {
+    renderResults(allRows, params, pairCounts);
+  }
+
+  setProgress(0);
+  setStatus('Listo.', false);
+  btn.disabled = false; btn.textContent = '▶ Descargar datos y analizar patrones';
+  running = false;
+}
+</script>
+</body>
+</html>
