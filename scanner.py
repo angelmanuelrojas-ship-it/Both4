@@ -7,7 +7,9 @@ Grupo B: RSI(14) < 30
 Señal BUY = Grupo A AND Grupo B
 
 Se ejecuta vía GitHub Actions cada 15 minutos.
-Envía alerta a Telegram solo cuando aparece una señal NUEVA (no repite avisos).
+Envía alerta a Telegram cuando:
+  1) Aparece una señal NUEVA (no repite avisos de la misma señal activa)
+  2) Una posición que se venía siguiendo llega a su TP (ganó) o SL (perdió)
 """
 
 import os
@@ -67,7 +69,7 @@ def stdev(arr, p, i):
         return None
     window = arr[i - p + 1:i + 1]
     m = sum(window) / p
-    return (sum((x - m) ** 2 for x in window) / p) ** 0.5
+    return (sum((x - m) * 2 for x in window) / p) * 0.5
 
 
 def rsi_at(closes, i, p=14):
@@ -178,41 +180,66 @@ def send_telegram(text):
 
 
 def load_state():
+    """Devuelve un dict: {symbol: {entry, sl, tp, opened_at}} de posiciones que se vienen siguiendo."""
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE) as f:
-            return set(json.load(f))
-    return set()
+            data = json.load(f)
+        # Compatibilidad con el formato viejo (lista de símbolos) -> migrar a dict vacío de detalle
+        if isinstance(data, list):
+            return {}
+        return data
+    return {}
 
 
-def save_state(signals):
+def save_state(open_positions):
     with open(STATE_FILE, "w") as f:
-        json.dump(sorted(signals), f)
+        json.dump(open_positions, f, indent=2)
 
 
 def main():
-    prev_signals = load_state()
-    current_signals = set()
+    open_positions = load_state()  # {sym: {entry, sl, tp, opened_at, rsi}}
     new_signals = []
-    results = []
+    closed_results = []  # (sym, 'WIN'/'LOSS', position_dict, exit_price)
 
     for sym, pair in KRAKEN_MAP.items():
         try:
             d = analyze(sym, pair)
-            results.append(d)
-            if d["buy_ok"]:
-                current_signals.add(sym)
-                if sym not in prev_signals:
+            price = d["price"]
+
+            # 1) Si ya hay una posición abierta para este símbolo, revisar si tocó TP o SL
+            if sym in open_positions:
+                pos = open_positions[sym]
+                if price >= pos["tp"]:
+                    closed_results.append((sym, "WIN", pos, price))
+                    del open_positions[sym]
+                elif price <= pos["sl"]:
+                    closed_results.append((sym, "LOSS", pos, price))
+                    del open_positions[sym]
+                # si no tocó ninguno, sigue abierta, no hacer nada más con este símbolo
+            else:
+                # 2) Si no hay posición abierta y aparece señal BUY, es una señal nueva
+                if d["buy_ok"]:
                     new_signals.append(d)
-            print(f"{sym}: RSI={d['rsi']:.1f} GrupoA={d['grupo_a']} BUY={d['buy_ok']}")
+                    open_positions[sym] = {
+                        "entry": d["price"],
+                        "sl": d["sl"],
+                        "tp": d["tp"],
+                        "rsi": round(d["rsi"], 1),
+                        "opened_at": int(time.time()),
+                    }
+
+            print(f"{sym}: RSI={d['rsi']:.1f} GrupoA={d['grupo_a']} BUY={d['buy_ok']} "
+                  f"{'(siguiendo posición abierta)' if sym in open_positions else ''}")
         except Exception as e:
             print(f"Error en {sym}: {e}")
         time.sleep(1)
 
+    # ── Avisos de nuevas señales ──
     if new_signals:
-        lines = ["🔔 *BOT4H — Nueva señal BUY*\n"]
+        lines = ["🔔 BOT4H — Nueva señal BUY\n"]
         for d in new_signals:
             lines.append(
-                f"*{d['sym']}*\n"
+                f"{d['sym']}\n"
                 f"  Precio: {fmt_price(d['price'])}\n"
                 f"  RSI: {d['rsi']:.1f}\n"
                 f"  Riesgo: ${d['risk_amt']:.2f}\n"
@@ -220,17 +247,34 @@ def main():
                 f"  SL: {fmt_price(d['sl'])}\n"
             )
         send_telegram("\n".join(lines))
-        print(f"Alerta enviada para: {[d['sym'] for d in new_signals]}")
+        print(f"Alerta de señal nueva enviada para: {[d['sym'] for d in new_signals]}")
     else:
         print("Sin señales nuevas.")
 
-    # Señales que desaparecieron (cerraron zona) — opcional, solo log
-    closed = prev_signals - current_signals
-    if closed:
-        print(f"Señales que ya no están activas: {closed}")
+    # ── Avisos de resultado (TP o SL alcanzado) ──
+    if closed_results:
+        lines = []
+        for sym, result, pos, exit_price in closed_results:
+            emoji = "✅" if result == "WIN" else "❌"
+            label = "Ganó (TP alcanzado)" if result == "WIN" else "Perdió (SL alcanzado)"
+            risk_amt = SIM_CAPITAL * RISK_PCT
+            pnl = risk_amt * RR if result == "WIN" else -risk_amt
+            lines.append(
+                f"{emoji} BOT4H — {label}\n"
+                f"{sym}\n"
+                f"  Entrada: {fmt_price(pos['entry'])}\n"
+                f"  Salida: {fmt_price(exit_price)}\n"
+                f"  RSI entrada: {pos['rsi']}\n"
+                f"  Resultado: {'+' if pnl >= 0 else ''}${pnl:.2f}\n"
+            )
+        send_telegram("\n\n".join(lines))
+        print(f"Alerta de resultado enviada para: {[(r[0], r[1]) for r in closed_results]}")
+    else:
+        print("Ninguna posición alcanzó TP/SL en este ciclo.")
 
-    save_state(current_signals)
+    print(f"Posiciones abiertas actualmente: {list(open_positions.keys()) or 'ninguna'}")
+    save_state(open_positions)
 
 
-if __name__ == "__main__":
+if _name_ == "_main_":
     main()
