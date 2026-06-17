@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MNQ — Minería de Patrón: Banda Inferior de Bollinger @ 18:00 ET</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #131722;
+    --panel-2: #1a1f2e;
+    --border: #232838;
+    --text: #e6e9f0;
+    --text-dim: #8b93a7;
+    --green: #2ecc71;
+    --red: #e74c3c;
+    --amber: #f5a623;
+    --blue: #4a9eff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 16px;
+    font-size: 14px;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 16px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .panel h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin: 0 0 10px;
+  }
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+  input, select {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  button {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    padding: 11px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 12px;
+  }
+  button:disabled { background: #2a3142; cursor: not-allowed; color: var(--text-dim); }
+  button:active:not(:disabled) { opacity: 0.85; }
+  .status {
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    min-height: 18px;
+  }
+  .status.error { color: var(--red); }
+  .status.ok { color: var(--green); }
+  .grid-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  @media (min-width: 600px) {
+    .grid-stats { grid-template-columns: repeat(4, 1fr); }
+  }
+  .stat-box {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-box .label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; }
+  .stat-box .value { font-size: 22px; font-weight: 700; }
+  .stat-box .sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .compare-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .compare-col {
+    flex: 1;
+    background: var(--panel-2);
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid var(--border);
+  }
+  .compare-col h3 { font-size: 12px; color: var(--text-dim); margin: 0 0 8px; font-weight: 600; }
+  .verdict {
+    padding: 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.5;
+    margin-top: 10px;
+  }
+  .verdict.support { background: rgba(46,204,113,0.1); border: 1px solid var(--green); }
+  .verdict.against { background: rgba(231,76,60,0.1); border: 1px solid var(--red); }
+  .verdict.neutral { background: rgba(245,166,35,0.1); border: 1px solid var(--amber); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  th, td {
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  th { color: var(--text-dim); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
+  .table-wrap { overflow-x: auto; max-height: 360px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge.up { background: rgba(46,204,113,0.15); color: var(--green); }
+  .badge.down { background: rgba(231,76,60,0.15); color: var(--red); }
+  .badge.low-sample { background: rgba(245,166,35,0.15); color: var(--amber); }
+  .badge.good-sample { background: rgba(46,204,113,0.12); color: var(--green); }
+  tr.best-hour { background: rgba(46,204,113,0.06); }
+  .footer-note { font-size: 11.5px; color: var(--text-dim); line-height: 1.5; margin-top: 4px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<h1>MNQ — Minería: Toque a Banda Inferior de Bollinger @ 18:00 ET</h1>
+<div class="subtitle">Hipótesis a validar: al tocar/romper la banda inferior cerca de las 18:00 ET, el precio tiende a rebotar (revertir al alza) más que en otras horas del día.</div>
+
+<div class="panel">
+  <h2>Configuración</h2>
+  <div class="controls">
+    <div>
+      <label>Símbolo (proxy de MNQ)</label>
+      <select id="symbol">
+        <option value="NQ=F">NQ=F (Nasdaq-100 Futures continuo)</option>
+        <option value="^NDX">^NDX (Índice Nasdaq-100 spot)</option>
+      </select>
+    </div>
+    <div>
+      <label>Período Bollinger</label>
+      <input type="number" id="bbPeriod" value="20" min="5" max="50">
+    </div>
+    <div>
+      <label>Desviaciones estándar</label>
+      <input type="number" id="bbStdDev" value="2" min="1" max="4" step="0.1">
+    </div>
+    <div>
+      <label>Hora objetivo (ET)</label>
+      <input type="number" id="targetHour" value="18" min="0" max="23">
+    </div>
+    <div>
+      <label>Ventana ± horas</label>
+      <input type="number" id="hourWindow" value="0" min="0" max="3">
+    </div>
+    <div>
+      <label>Rango histórico</label>
+      <select id="rangeSel">
+        <option value="2y">2 años</option>
+        <option value="1y">1 año</option>
+        <option value="6mo">6 meses</option>
+        <option value="3mo">3 meses</option>
+      </select>
+    </div>
+  </div>
+  <button id="runBtn" onclick="runAnalysis()">Ejecutar minería de patrón</button>
+  <button id="sweepBtn" onclick="runHourSweep()" style="background: var(--panel-2); border: 1px solid var(--border); margin-top: 8px;" disabled>Barrer las 24 horas (requiere datos ya cargados)</button>
+  <div class="status" id="statusMsg"></div>
+</div>
+
+<div class="panel" id="csvFallbackPanel">
+  <h2>Alternativa si la descarga automática falla</h2>
+  <div class="footer-note" style="margin-bottom:10px;">
+    Yahoo Finance bloquea peticiones automatizadas con frecuencia. Si después de varios intentos sigue fallando, puedes descargar el CSV manualmente desde tu navegador y subirlo aquí: ve a <strong>finance.yahoo.com</strong>, busca <strong>NQ=F</strong>, pestaña "Historical Data", marca intervalo "Daily" o usa la pestaña de gráfico para exportar 1h si está disponible, y descarga el CSV. Columnas esperadas: Date/Datetime, Open, High, Low, Close.
+  </div>
+  <input type="file" id="csvFileInput" accept=".csv" onchange="handleCsvUpload(event)">
+  <div class="status" id="csvStatusMsg"></div>
+</div>
+
+<div class="panel hidden" id="resultsPanel">
+  <h2>Resultado — Toques en hora objetivo vs. resto del día</h2>
+  <div class="compare-row">
+    <div class="compare-col">
+      <h3>🎯 EN VENTANA (≈18:00 ET)</h3>
+
+      <div class="grid-stats" id="targetStats" style="grid-template-columns: repeat(2,1fr);"></div>
+    </div>
+    <div class="compare-col">
+      <h3>🌐 RESTO DEL DÍA (control)</h3>
+      <div class="grid-stats" id="controlStats" style="grid-template-columns: repeat(2,1fr);"></div>
+    </div>
+  </div>
+  <div class="verdict" id="verdictBox"></div>
+</div>
+
+<div class="panel hidden" id="tablePanel">
+  <h2>Detalle de toques en ventana objetivo</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Hora ET</th>
+          <th>Precio toque</th>
+          <th>Banda inf.</th>
+          <th>Cierre del día</th>
+          <th>Resultado</th>
+          <th>Mov. %</th>
+        </tr>
+      </thead>
+      <tbody id="detailTableBody"></tbody>
+    </table>
+  </div>
+  <div class="footer-note">
+    "Cierre del día" = última vela horaria disponible de esa misma sesión calendario (intradía, no overnight). "Rebote" = el cierre del día terminó por encima del precio en el momento del toque.
+  </div>
+</div>
+
+<div class="panel hidden" id="sweepPanel">
+  <h2>Barrido por hora — ¿qué hora ET tiene mejor edge al tocar la banda inferior?</h2>
+  <div class="footer-note" style="margin-bottom:10px;">
+    Cada fila es una hora ET distinta. Ordenado por win rate descendente. Las horas con pocos eventos (&lt;15) están marcadas — su resultado es menos confiable.
+  </div>
+  <div class="table-wrap" style="max-height: 480px;">
+    <table>
+      <thead>
+        <tr>
+          <th>Hora ET</th>
+          <th>Nº toques</th>
+          <th>Win rate</th>
+          <th>Mov. promedio</th>
+          <th>Avg. ganador</th>
+          <th>Avg. perdedor</th>
+          <th>Muestra</th>
+        </tr>
+      </thead>
+      <tbody id="sweepTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+
+<div class="panel">
+  <h2>Notas metodológicas</h2>
+  <div class="footer-note">
+    • Datos: Yahoo Finance, velas de 1 hora sobre NQ=F (futuro continuo del Nasdaq-100), usado como proxy de precio de MNQ (mismo subyacente, distinto multiplicador de contrato — el movimiento porcentual es equivalente).<br>
+    • Yahoo limita el histórico horario a un máximo de ~2 años; si pides más, se recorta automáticamente.<br>
+    • Esto es minería exploratoria, no una señal de trading lista para usar: con pocos eventos (ej. &lt;30 toques en la ventana objetivo) el resultado puede ser ruido estadístico, no un edge real. Útil para decidir si vale la pena seguir investigando esta idea con más rigor (out-of-sample, distintos años, costos de operar).<br>
+    • Si Yahoo Finance bloquea la petición directa por CORS, la herramienta reintenta automáticamente vía un proxy público (allorigins.win), igual que en tu scanner de cripto.
+  </div>
+</div>
+
+<script>
+const statusMsg = document.getElementById('statusMsg');
+const runBtn = document.getElementById('runBtn');
+let lastCandles = null;
+let lastBands = null;
+
+function setStatus(msg, type) {
+  statusMsg.textContent = msg;
+  statusMsg.className = 'status' + (type ? ' ' + type : '');
+}
+
+// --- Fetch helpers: direct first, then a cascade of CORS proxies ---
+const PROXY_BUILDERS = [
+  (url) => url, // direct, no proxy
+  (url) => 'https://corsproxy.io/?url=' + encodeURIComponent(url),
+  (url) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+  (url) => 'https://thingproxy.freeboard.io/fetch/' + url,
+  (url) => 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url),
+];
+
+async function fetchJson(url, onProgress) {
+  const errors = [];
+  for (let i = 0; i < PROXY_BUILDERS.length; i++) {
+    const attemptUrl = PROXY_BUILDERS[i](url);
+    if (onProgress) onProgress(i, PROXY_BUILDERS.length);
+    try {
+      const r = await fetch(attemptUrl, { headers: { 'Accept': 'application/json' } });
+      if (!r.ok) {
+        errors.push(`Ruta ${i + 1}: HTTP ${r.status}`);
+        continue;
+      }
+      const text = await r.text();
+      // Some proxies wrap or prefix the body; try to locate the JSON object
+      const jsonStart = text.indexOf('{');
+      const cleanText = jsonStart > 0 ? text.slice(jsonStart) : text;
+      const data = JSON.parse(cleanText);
+      return data;
+    } catch (e) {
+      errors.push(`Ruta ${i + 1} (${i === 0 ? 'directa' : 'proxy'}): ${e.message}`);
+      continue;
+    }
+  }
+  throw new Error('Todas las rutas de conexión fallaron. ' + errors.join(' | '));
+}
+
+async function fetchYahooHourly(symbol, range) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=60m&range=${range}`;
+  const data = await fetchJson(url, (i, total) => {
+    setStatus(`Probando ruta de conexión ${i + 1} de ${total}...`, null);
+  });
+  const result = data?.chart?.result?.[0];
+  if (!result) throw new Error('Respuesta inesperada de Yahoo Finance.');
+  const ts = result.timestamp;
+  const q = result.indicators.quote[0];
+  if (!ts || !q) throw new Error('No se encontraron velas en la respuesta.');
+  const candles = [];
+  for (let i = 0; i < ts.length; i++) {
+    if (q.open[i] == null || q.close[i] == null || q.high[i] == null || q.low[i] == null) continue;
+    candles.push({
+      t: ts[i] * 1000, // ms epoch UTC
+      o: q.open[i], h: q.high[i], l: q.low[i], c: q.close[i]
+    });
+  }
+  if (candles.length === 0) throw new Error('No hay velas válidas tras filtrar nulos.');
+  return candles;
+}
+
+// --- Bollinger Bands ---
+function computeBollinger(candles, period, stdDevMult) {
+  const closes = candles.map(c => c.c);
+  const bands = new Array(candles.length).fill(null);
+  for (let i = period - 1; i < closes.length; i++) {
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += closes[j];
+    const mean = sum / period;
+    let sqSum = 0;
+    for (let j = i - period + 1; j <= i; j++) sqSum += Math.pow(closes[j] - mean, 2);
+    const std = Math.sqrt(sqSum / period);
+    bands[i] = {
+      mid: mean,
+      upper: mean + stdDevMult * std,
+      lower: mean - stdDevMult * std
+    };
+  }
+  return bands;
+}
+
+// --- Manual CSV upload fallback ---
+function parseCsvToCandles(csvText) {
+  const lines = csvText.trim().split(/\r?\n/);
+  if (lines.length < 2) throw new Error('El CSV no tiene suficientes filas.');
+  const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const idx = {
+    date: header.findIndex(h => h.includes('date') || h.includes('time')),
+    open: header.findIndex(h => h === 'open'),
+    high: header.findIndex(h => h === 'high'),
+    low: header.findIndex(h => h === 'low'),
+    close: header.findIndex(h => h === 'close' || h === 'close/last' || h === 'adj close')
+  };
+  if (idx.date === -1 || idx.open === -1 || idx.high === -1 || idx.low === -1 || idx.close === -1) {
+    throw new Error('No se encontraron columnas Date/Open/High/Low/Close en el CSV. Revisa el encabezado.');
+  }
+  const candles = [];
+  for (let i = 1; i < lines.length; i++) {
+    const row = lines[i].split(',');
+    if (row.length < header.length) continue;
+    const dateStr = row[idx.date].trim();
+    const t = new Date(dateStr).getTime();
+    if (isNaN(t)) continue;
+    const o = parseFloat(row[idx.open]);
+    const h = parseFloat(row[idx.high]);
+    const l = parseFloat(row[idx.low]);
+    const c = parseFloat(row[idx.close]);
+    if ([o, h, l, c].some(v => isNaN(v))) continue;
+    candles.push({ t, o, h, l, c });
+  }
+  if (candles.length === 0) throw new Error('No se pudo extraer ninguna vela válida del CSV.');
+  candles.sort((a, b) => a.t - b.t);
+  return candles;
+}
+
+async function handleCsvUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const csvStatus = document.getElementById('csvStatusMsg');
+  csvStatus.className = 'status';
+  csvStatus.textContent = 'Leyendo archivo...';
+  try {
+    const text = await file.text();
+    const candles = parseCsvToCandles(text);
+    csvStatus.className = 'status ok';
+    csvStatus.textContent = `Archivo cargado: ${candles.length} velas válidas. Ejecutando análisis...`;
+    runAnalysisWithCandles(candles);
+  } catch (err) {
+    csvStatus.className = 'status error';
+    csvStatus.textContent = 'Error leyendo CSV: ' + err.message;
+  }
+}
+
+
+function getETParts(utcMs) {
+  const d = new Date(utcMs);
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', hour12: false
+  });
+  const parts = fmt.formatToParts(d);
+  const map = {};
+  parts.forEach(p => map[p.type] = p.value);
+  let hour = parseInt(map.hour, 10);
+  if (hour === 24) hour = 0;
+  return {
+    dateKey: `${map.year}-${map.month}-${map.day}`,
+    hour
+  };
+}
+
+function fmtPct(x) {
+  const sign = x > 0 ? '+' : '';
+  return sign + x.toFixed(2) + '%';
+}
+
+function statBoxHtml(label, value, sub) {
+  return `<div class="stat-box"><div class="label">${label}</div><div class="value">${value}</div>${sub ? `<div class="sub">${sub}</div>` : ''}</div>`;
+}
+
+async function runAnalysis() {
+  runBtn.disabled = true;
+  document.getElementById('resultsPanel').classList.add('hidden');
+  document.getElementById('tablePanel').classList.add('hidden');
+  setStatus('Descargando histórico de Yahoo Finance...', null);
+
+  const symbol = document.getElementById('symbol').value;
+  const range = document.getElementById('rangeSel').value;
+
+  try {
+    const candles = await fetchYahooHourly(symbol, range);
+    setStatus(`Descargadas ${candles.length} velas de 1h. Calculando Bandas de Bollinger...`, null);
+    runAnalysisWithCandles(candles);
+    setStatus(`Listo. ${candles.length} velas analizadas vía descarga automática.`, 'ok');
+  } catch (err) {
+    console.error(err);
+    setStatus('Error: ' + err.message + ' — Prueba el botón de nuevo, o usa la opción de subir CSV manualmente más abajo.', 'error');
+  } finally {
+    runBtn.disabled = false;
+  }
+}
+
+function runAnalysisWithCandles(candles) {
+  const period = parseInt(document.getElementById('bbPeriod').value, 10);
+  const stdDevMult = parseFloat(document.getElementById('bbStdDev').value);
+  const targetHour = parseInt(document.getElementById('targetHour').value, 10);
+  const hourWindow = parseInt(document.getElementById('hourWindow').value, 10);
+
+  const bands = computeBollinger(candles, period, stdDevMult);
+  lastCandles = candles;
+  lastBands = bands;
+  document.getElementById('sweepBtn').disabled = false;
+
+    // Group candle indices by ET calendar date to find each day's last available candle (intraday close)
+    const dateToIndices = new Map();
+    for (let i = 0; i < candles.length; i++) {
+      const { dateKey } = getETParts(candles[i].t);
+      if (!dateToIndices.has(dateKey)) dateToIndices.set(dateKey, []);
+      dateToIndices.get(dateKey).push(i);
+    }
+
+    const targetTouches = [];
+    const controlTouches = [];
+
+    for (let i = period; i < candles.length; i++) {
+      const band = bands[i];
+      if (!band) continue;
+      const candle = candles[i];
+      // Touch/break of lower band: low <= lower band
+      if (candle.l > band.lower) continue;
+
+      const { dateKey, hour } = getETParts(candle.t);
+      const dayIndices = dateToIndices.get(dateKey);
+      const lastIdxOfDay = dayIndices[dayIndices.length - 1];
+      const dayCloseCandle = candles[lastIdxOfDay];
+
+      // Reference price at moment of touch: use close of the touching candle
+      const touchPrice = candle.c;
+      const dayClose = dayCloseCandle.c;
+      const movePct = ((dayClose - touchPrice) / touchPrice) * 100;
+      const isRebound = dayClose > touchPrice;
+
+      const touchRecord = {
+        dateKey, hour,
+        touchPrice, lower: band.lower, dayClose, movePct, isRebound
+      };
+
+      const inWindow = Math.abs(hour - targetHour) <= hourWindow;
+      if (inWindow) {
+        targetTouches.push(touchRecord);
+      } else {
+        controlTouches.push(touchRecord);
+      }
+    }
+
+    function summarize(arr) {
+      if (arr.length === 0) return null;
+      const n = arr.length;
+      const wins = arr.filter(t => t.isRebound).length;
+      const winRate = (wins / n) * 100;
+      const avgMove = arr.reduce((s, t) => s + t.movePct, 0) / n;
+      const avgWin = arr.filter(t => t.isRebound).reduce((s, t) => s + t.movePct, 0) / (wins || 1);
+      const losses = arr.filter(t => !t.isRebound);
+      const avgLoss = losses.reduce((s, t) => s + t.movePct, 0) / (losses.length || 1);
+      return { n, winRate, avgMove, avgWin, avgLoss, wins, lossesN: losses.length };
+    }
+
+    const targetSummary = summarize(targetTouches);
+  const controlSummary = summarize(controlTouches);
+
+  renderResults(targetSummary, controlSummary, targetTouches, targetHour, hourWindow);
+  document.getElementById('resultsPanel').classList.remove('hidden');
+}
+
+function renderResults(target, control, targetTouches, targetHour, hourWindow) {
+  const resultsPanel = document.getElementById('resultsPanel');
+  const tablePanel = document.getElementById('tablePanel');
+  resultsPanel.classList.remove('hidden');
+
+  const targetStatsEl = document.getElementById('targetStats');
+  const controlStatsEl = document.getElementById('controlStats');
+
+  if (!target) {
+    targetStatsEl.innerHTML = `<div class="stat-box"><div class="label">Sin datos</div><div class="value">—</div></div>`;
+  } else {
+    targetStatsEl.innerHTML =
+      statBoxHtml('Nº toques', target.n) +
+      statBoxHtml('Win rate (rebote)', target.winRate.toFixed(1) + '%', `${target.wins} de ${target.n}`) +
+      statBoxHtml('Mov. promedio', fmtPct(target.avgMove), 'hasta cierre del día') +
+      statBoxHtml('Avg. ganador / perdedor', fmtPct(target.avgWin) + ' / ' + fmtPct(target.avgLoss));
+  }
+
+  if (!control) {
+    controlStatsEl.innerHTML = `<div class="stat-box"><div class="label">Sin datos</div><div class="value">—</div></div>`;
+  } else {
+    controlStatsEl.innerHTML =
+      statBoxHtml('Nº toques', control.n) +
+      statBoxHtml('Win rate (rebote)', control.winRate.toFixed(1) + '%', `${control.wins} de ${control.n}`) +
+      statBoxHtml('Mov. promedio', fmtPct(control.avgMove), 'hasta cierre del día') +
+      statBoxHtml('Avg. ganador / perdedor', fmtPct(control.avgWin) + ' / ' + fmtPct(control.avgLoss));
+  }
+
+  // Verdict
+  const verdictBox = document.getElementById('verdictBox');
+  if (!target || target.n < 15) {
+    verdictBox.className = 'verdict neutral';
+    verdictBox.innerHTML = `⚠️ <strong>Muestra insuficiente.</strong> Solo hay ${target ? target.n : 0} toques en la ventana de las ${targetHour}:00 ET (±${hourWindow}h) dentro del rango descargado. Con menos de ~15-20 eventos no se puede concluir nada con confianza — podría ser casualidad. Prueba ampliar el rango histórico o la ventana de horas.`;
+  } else {
+    const diff = target.winRate - (control ? control.winRate : 50);
+    const diffMove = target.avgMove - (control ? control.avgMove : 0);
+    if (diff > 8 && diffMove > 0) {
+      verdictBox.className = 'verdict support';
+      verdictBox.innerHTML = `✅ <strong>El patrón muestra señal positiva.</strong> El win rate en la ventana objetivo (${target.winRate.toFixed(1)}%) supera al del resto del día (${control ? control.winRate.toFixed(1) : '—'}%) por ${diff.toFixed(1)} puntos, y el movimiento promedio hasta el cierre también es mejor (${fmtPct(target.avgMove)} vs ${control ? fmtPct(control.avgMove) : '—'}). Aun así, con ${target.n} eventos, conviene confirmar en otro rango de fechas (out-of-sample) antes de operar esto en real.`;
+    } else if (diff < -8) {
+      verdictBox.className = 'verdict against';
+      verdictBox.innerHTML = `❌ <strong>No se confirma la hipótesis.</strong> El win rate en la ventana objetivo (${target.winRate.toFixed(1)}%) es de hecho ${Math.abs(diff).toFixed(1)} puntos MENOR que el del resto del día (${control ? control.winRate.toFixed(1) : '—'}%). Lo que percibiste podría ser un sesgo de memoria (recordamos más los días que sí funcionó) o casualidad en pocas observaciones recientes.`;
+    } else {
+      verdictBox.className = 'verdict neutral';
+      verdictBox.innerHTML = `〜 <strong>No hay diferencia clara.</strong> El comportamiento a las ${targetHour}:00 ET (win rate ${target.winRate.toFixed(1)}%) es prácticamente igual al de tocar la banda inferior en cualquier otra hora (${control ? control.winRate.toFixed(1) : '—'}%). Es decir, la banda de Bollinger sí tiende a generar rebotes en general (eso es esperable por diseño del indicador), pero no hay evidencia de que las 18:00 ET sea especial.`;
+    }
+  }
+
+  // Detail table
+  if (targetTouches.length > 0) {
+    tablePanel.classList.remove('hidden');
+    const tbody = document.getElementById('detailTableBody');
+    const sorted = [...targetTouches].sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+    tbody.innerHTML = sorted.map(t => `
+      <tr>
+        <td>${t.dateKey}</td>
+        <td>${String(t.hour).padStart(2, '0')}:00</td>
+        <td>${t.touchPrice.toFixed(2)}</td>
+        <td>${t.lower.toFixed(2)}</td>
+        <td>${t.dayClose.toFixed(2)}</td>
+        <td><span class="badge ${t.isRebound ? 'up' : 'down'}">${t.isRebound ? 'Rebote ↑' : 'Sin rebote ↓'}</span></td>
+        <td class="${t.movePct >= 0 ? 'pos' : 'neg'}">${fmtPct(t.movePct)}</td>
+      </tr>
+    `).join('');
+  }
+}
+
+// --- Sweep all 24 ET hours to find which hour (if any) has a real edge ---
+function runHourSweep() {
+  if (!lastCandles || !lastBands) {
+    setStatus('Primero ejecuta la minería de patrón para descargar datos.', 'error');
+    return;
+  }
+  const candles = lastCandles;
+  const bands = lastBands;
+  const period = parseInt(document.getElementById('bbPeriod').value, 10);
+
+  // Group by ET date to find each day's intraday close, same logic as main analysis
+  const dateToIndices = new Map();
+  for (let i = 0; i < candles.length; i++) {
+    const { dateKey } = getETParts(candles[i].t);
+    if (!dateToIndices.has(dateKey)) dateToIndices.set(dateKey, []);
+    dateToIndices.get(dateKey).push(i);
+  }
+
+  // Collect every lower-band touch, tagged by hour
+  const touchesByHour = {};
+  for (let h = 0; h < 24; h++) touchesByHour[h] = [];
+
+  for (let i = period; i < candles.length; i++) {
+    const band = bands[i];
+    if (!band) continue;
+    const candle = candles[i];
+    if (candle.l > band.lower) continue;
+
+    const { dateKey, hour } = getETParts(candle.t);
+    const dayIndices = dateToIndices.get(dateKey);
+    const lastIdxOfDay = dayIndices[dayIndices.length - 1];
+    const dayCloseCandle = candles[lastIdxOfDay];
+
+    const touchPrice = candle.c;
+    const dayClose = dayCloseCandle.c;
+    const movePct = ((dayClose - touchPrice) / touchPrice) * 100;
+    const isRebound = dayClose > touchPrice;
+
+    touchesByHour[hour].push({ movePct, isRebound });
+  }
+
+  function summarize(arr) {
+    if (arr.length === 0) return null;
+    const n = arr.length;
+    const wins = arr.filter(t => t.isRebound).length;
+    const winRate = (wins / n) * 100;
+    const avgMove = arr.reduce((s, t) => s + t.movePct, 0) / n;
+    const winners = arr.filter(t => t.isRebound);
+    const losers = arr.filter(t => !t.isRebound);
+    const avgWin = winners.reduce((s, t) => s + t.movePct, 0) / (winners.length || 1);
+    const avgLoss = losers.reduce((s, t) => s + t.movePct, 0) / (losers.length || 1);
+    return { n, winRate, avgMove, avgWin, avgLoss };
+  }
+
+  const rows = [];
+  for (let h = 0; h < 24; h++) {
+    const summary = summarize(touchesByHour[h]);
+    if (summary) rows.push({ hour: h, ...summary });
+  }
+
+  // Sort by win rate descending
+  rows.sort((a, b) => b.winRate - a.winRate);
+
+  const sweepPanel = document.getElementById('sweepPanel');
+  sweepPanel.classList.remove('hidden');
+  const tbody = document.getElementById('sweepTableBody');
+
+  const MIN_SAMPLE = 15;
+  const maxWinRate = rows.length ? rows[0].winRate : 0;
+
+  tbody.innerHTML = rows.map(r => {
+    const isGoodSample = r.n >= MIN_SAMPLE;
+    const isTopRow = r.winRate === maxWinRate && isGoodSample;
+    return `
+      <tr class="${isTopRow ? 'best-hour' : ''}">
+        <td>${String(r.hour).padStart(2, '0')}:00 ET</td>
+        <td>${r.n}</td>
+        <td class="${r.winRate >= 55 ? 'pos' : (r.winRate <= 45 ? 'neg' : '')}">${r.winRate.toFixed(1)}%</td>
+        <td class="${r.avgMove >= 0 ? 'pos' : 'neg'}">${fmtPct(r.avgMove)}</td>
+        <td class="pos">${fmtPct(r.avgWin)}</td>
+        <td class="neg">${fmtPct(r.avgLoss)}</td>
+        <td><span class="badge ${isGoodSample ? 'good-sample' : 'low-sample'}">${isGoodSample ? 'OK' : 'baja (n<' + MIN_SAMPLE + ')'}</span></td>
+      </tr>
+    `;
+  }).join('');
+
+  // Scroll sweep panel into view
+  sweepPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+</script>
+
+</body>
+</html>
